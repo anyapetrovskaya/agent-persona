@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$AP_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$AP_DIR" && git rev-parse --show-toplevel 2>/dev/null || echo "$AP_DIR")"
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
