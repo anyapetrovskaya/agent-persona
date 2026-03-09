@@ -2,17 +2,17 @@
 
 A collaborator that remembers. Agent Persona gives your AI assistant long-term memory, adaptive personality, and the ability to learn how you work — across sessions, across days, across projects.
 
-## Getting Started
-
-### Install
+## Quick start
 
 ```bash
-# Install into your project
-./agent-persona/scripts/install.sh /path/to/your-project
-
-# Or from a downloaded release
-./install.sh /path/to/your-project
+git clone https://github.com/anyapetrovskaya/agent-persona.git
+cd agent-persona
+./scripts/install.sh ~/path/to/your/project
 ```
+
+Then open your project in Cursor and say hi.
+
+## Getting Started
 
 ### First Conversation
 
