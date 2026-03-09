@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./agent-persona/scripts/init.sh
-#   ./agent-persona/scripts/init.sh --git-sync
+#   ./agent-persona/scripts/init.sh --web
 
 set -euo pipefail
 
@@ -15,24 +15,24 @@ REPO_ROOT="$(cd "$AP_DIR" && git rev-parse --show-toplevel 2>/dev/null || echo "
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
-GIT_SYNC=false
+WEB_MODE=false
 
 for arg in "$@"; do
   case "$arg" in
-    --git-sync) GIT_SYNC=true ;;
+    --web) WEB_MODE=true ;;
     -h|--help)
-      echo "Usage: $0 [--git-sync]"
+      echo "Usage: $0 [--web]"
       echo ""
       echo "Initializes agent-persona for in-place use."
       echo ""
       echo "Flags:"
-      echo "  --git-sync   Enable git_sync in config.json"
+      echo "  --web        Set up for Cursor Web (enables git sync, open-to-anything personality)"
       echo "  -h, --help   Show this help message"
       exit 0
       ;;
     *)
       echo "Error: unknown argument: $arg" >&2
-      echo "Usage: $0 [--git-sync]" >&2
+      echo "Usage: $0 [--web]" >&2
       exit 1
       ;;
   esac
@@ -73,10 +73,10 @@ if [ -f "$AP_DIR/rules/agent-persona.mdc" ]; then
   RULE_STATUS="Agent rule installed"
 fi
 
-# ── Handle --git-sync ────────────────────────────────────────────────────────
+# ── Handle --web mode ────────────────────────────────────────────────────────
 
 CONFIG_STATUS=""
-if [ "$GIT_SYNC" = true ]; then
+if [ "$WEB_MODE" = true ]; then
   CONFIG="$AP_DIR/config.json"
   if [ -f "$CONFIG" ]; then
     sed -i 's/"git_sync": false/"git_sync": true/' "$CONFIG"
@@ -84,6 +84,17 @@ if [ "$GIT_SYNC" = true ]; then
     echo '{"git_sync": true}' > "$CONFIG"
   fi
   CONFIG_STATUS="git_sync: true"
+
+  # Set default personality to open-to-anything
+  PERSONA="$AP_DIR/data/base_persona.json"
+  if [ -f "$PERSONA" ]; then
+    sed -i 's/"default_mode": "[^"]*"/"default_mode": "open-to-anything"/' "$PERSONA"
+  fi
+
+  # Set active personality
+  echo "open-to-anything" > "$AP_DIR/data/active_personality.txt"
+
+  CONFIG_STATUS="git_sync: true, personality: open-to-anything"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
@@ -94,7 +105,7 @@ echo ""
 echo "  data/          $DATA_STATUS"
 echo "  .cursor/rules/ $RULE_STATUS"
 if [ -n "$CONFIG_STATUS" ]; then
-  echo "  config.json    $CONFIG_STATUS"
+  echo "  config         $CONFIG_STATUS"
 fi
 echo ""
 echo "Open this folder in Cursor and say hi."
