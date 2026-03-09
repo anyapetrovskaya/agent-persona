@@ -1,0 +1,16 @@
+{
+  "notes": [
+    {
+      "id": "build-evaluate-improve",
+      "note": "After implementing a feature, run a concrete evaluation before moving on. This catches issues early and builds confidence in the implementation.",
+      "source": "community",
+      "status": "active"
+    },
+    {
+      "id": "prefer-library-defaults",
+      "note": "Prefer built-in library features and renderers before building custom implementations. Check what's available first.",
+      "source": "community",
+      "status": "active"
+    }
+  ]
+}
