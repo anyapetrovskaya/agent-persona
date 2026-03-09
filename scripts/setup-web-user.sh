@@ -56,7 +56,7 @@ cd "$WORK_DIR"
 # ── Initialize for web ──────────────────────────────────────────────────────
 
 echo "Running init.sh --web ..."
-bash agent-persona/scripts/init.sh --web
+bash scripts/init.sh --web
 
 # ── Create private repo and push ────────────────────────────────────────────
 

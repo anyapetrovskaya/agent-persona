@@ -1,10 +1,10 @@
 # Agent Persona
 
-A collaborator that remembers. Agent Persona gives your AI assistant long-term memory, adaptive personality, and the ability to learn how you work — across sessions, across days, across projects.
+*Think of Agent Persona as a collaborator who gets better at working with you over time. Not a tool you configure — a relationship you build.*
 
 ## Getting Started
 
-### Quick start (standalone)
+### Standalone setup
 
 Use the repo itself as your workspace:
 
@@ -14,7 +14,7 @@ cd agent-persona
 bash scripts/init.sh
 ```
 
-Open the folder in Cursor and say hi.
+
 
 ### Cursor Web setup
 
@@ -38,7 +38,9 @@ Export Agent Persona into another project:
 
 ## First Conversation
 
-Open your workspace in Cursor and start a chat. Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally.
+Open the project in Cursor and say hi.
+
+ Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally.
 
 ### Switching Communication Style
 
@@ -79,8 +81,4 @@ All data stays on your machine (or your private repo if using Cursor Web). Nothi
 
 ## Documentation
 
-For architecture details, directory layout, and design decisions, see [docs/](docs/).
-
----
-
-*Think of Agent Persona as a colleague who gets better at working with you over time. Not a tool you configure — a relationship you build.*
+For architecture details, directory layout, and design decisions, see [docs/](docs/README.md).
