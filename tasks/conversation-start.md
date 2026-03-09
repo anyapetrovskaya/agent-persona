@@ -25,6 +25,10 @@ From the user message: "anon mode" → **anon**, "standalone mode" → **standal
 - **anon:** Reads OK, no writes. Skip consolidation, proactive-initiative, suggest-learned-behavior.
 - **standalone:** Skip handoff. Episodic: own file only.
 
+### 0c. Git sync (pull)
+
+Read `agent-persona/config.json`. If `git_sync` is `true`, run `git pull` to fetch the latest data from the remote before loading anything. If the file is missing or `git_sync` is `false` or not present, skip this step silently.
+
 ### 1. Load handoff
 
 - **standalone:** Skip.

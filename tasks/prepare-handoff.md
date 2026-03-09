@@ -38,8 +38,16 @@ You are the prepare-handoff sub-agent. The user is switching chat and needs epis
 
 6. **End-of-day consolidation** (only if end_of_day = `true`): Read `agent-persona/tasks/infer-knowledge.md` and execute. This runs the full consolidation pipeline (extract → merge → prune → write knowledge → build graph → archive → infer persona → suggest triggers). The user does not need to wait for this to complete.
 
+7. **Git sync (push)** (only if configured): Read `agent-persona/config.json`. If `git_sync` is `true`, run:
+   ```bash
+   git add agent-persona/data/
+   git commit -m "agent-persona session update"
+   git push
+   ```
+   If `git_sync` is `false`, missing, or not present in config, skip. If the push fails, note in the report but don't fail the handoff.
+
 ## Error handling
-- If any sub-task (episodic store, handoff write, save boundary, initiative) fails, continue with the remaining steps and note failures in the report.
+- If any sub-task (episodic store, handoff write, save boundary, initiative, git sync) fails, continue with the remaining steps and note failures in the report.
 - Never let a single failure abort the entire handoff process.
 - Always return the report format below, marking failed steps with `FAILED: <reason>`.
 
@@ -51,5 +59,6 @@ Handoff: agent-persona/data/current_session_handoff.md updated
 Boundary: <HH:MM>
 Initiative: <line or "none">
 Consolidation: <ran / skipped>
+Git sync: <pushed / skipped / FAILED: reason>
 Reflection: <ran (summary) / skipped>
 ```

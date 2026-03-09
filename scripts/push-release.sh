@@ -28,6 +28,8 @@ done
 
 [ -f "$SOURCE_DIR/LICENSE" ] && cp "$SOURCE_DIR/LICENSE" .
 [ -f "$SOURCE_DIR/README.md" ] && cp "$SOURCE_DIR/README.md" .
+[ -f "$SOURCE_DIR/.gitignore" ] && cp "$SOURCE_DIR/.gitignore" .
+[ -f "$SOURCE_DIR/config.json" ] && cp "$SOURCE_DIR/config.json" .
 
 # ── Commit and push ─────────────────────────────────────────────────────────
 git add -A
