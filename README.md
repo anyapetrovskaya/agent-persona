@@ -4,85 +4,82 @@ A collaborator that remembers. Agent Persona gives your AI assistant long-term m
 
 ## Getting Started
 
-### Install
+### Quick start (standalone)
+
+Use the repo itself as your workspace:
 
 ```bash
 git clone https://github.com/anyapetrovskaya/agent-persona.git
 cd agent-persona
-./scripts/install.sh ~/path/to/your/project
+bash scripts/init.sh
 ```
 
-### First Conversation
+Open the folder in Cursor and say hi.
 
-Open your project in Cursor and say hi. That's it.
+### Cursor Web setup
 
- Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally, like you would with a colleague.
+For a cloud-based setup with persistent memory across sessions:
+
+```bash
+git clone https://github.com/anyapetrovskaya/agent-persona.git my-agent-persona
+cd my-agent-persona
+bash scripts/init.sh --web
+```
+
+Push to a private repo, then open it in Cursor Web.
+
+### Install into an existing project
+
+Export Agent Persona into another project:
+
+```bash
+./scripts/export-to-project.sh /path/to/your-project
+```
+
+## First Conversation
+
+Open your workspace in Cursor and start a chat. Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally.
 
 ### Switching Communication Style
 
-Agent Persona starts warm and encouraging. You can change this anytime:
+You can change the tone anytime:
 
-- "Be more concise" or "switch to expert-laconic" — direct and efficient
-- "Be more supportive" — warm and encouraging (default)
+- "Be more concise" — direct and efficient
+- "Be more supportive" — warm and encouraging
 - "Be more critical" — challenges your assumptions
 - Or describe what you want: "be brief but funny"
 
-## How It Works
+## Recommended Setup
 
-Agent Persona remembers your conversations and learns from them:
-
-- **Episodic memory** — what happened in each session
-- **Durable knowledge** — patterns, preferences, and facts extracted over time
-- **Personality calibration** — adapts tone and style to how you like to work
-- **Proactive initiative** — suggests next steps, catches things you might miss
-- **Session continuity** — picks up exactly where you left off
-
-Everything is stored locally in `agent-persona/data/`. You own your data.
-
-## Directory Layout
-
-| Path | What it is |
-|------|-----------|
-| `rules/` | The main rule file (copied to `.cursor/rules/` during install) |
-| `tasks/` | Task definitions — the system's behavior, written in plain English |
-| `scripts/` | Install, update, export, and visualization tools |
-| `docs/` | Design documentation for the system's architecture |
-| `data/` | Your personal data — memory, knowledge, personality, preferences |
-| `personalities/` | Communication style definitions |
+Agent Persona works best with **high-capability models** (e.g. Claude Opus 4.6). The system relies on complex rule-following, sub-agent orchestration, and multi-step task execution — weaker models may not follow the full workflow reliably.
 
 ## Managing Your Data
 
-### Version Control
+All data lives in `data/` — memory, knowledge, personality, preferences. You own it.
 
-Your data lives in `agent-persona/data/` and can be its own git repository:
-
-```bash
-cd your-project/agent-persona/data
-git remote add origin git@github.com:you/my-agent-memory.git
-git push -u origin main
-```
-
-### Export to Another Project
-
-Take your memory and personality to a different project:
+### Export to another project
 
 ```bash
-./agent-persona/scripts/export-to-project.sh /path/to/other-project
+./scripts/export-to-project.sh /path/to/other-project
 ```
 
-### Update the Framework
+### Update the framework
 
 Get the latest improvements without touching your data:
 
 ```bash
-./agent-persona/scripts/update.sh --source /path/to/agent-persona-release
+./scripts/update.sh --source /path/to/agent-persona-release
 ```
 
 Or just ask your agent: "Could you update agent-persona for me?"
 
 ## Privacy
 
-All data stays on your machine. Nothing is sent anywhere. The knowledge, personality, and memory files in `data/` are yours — readable, portable, and deletable at any time.
+All data stays on your machine (or your private repo if using Cursor Web). Nothing is sent to third parties. The knowledge, personality, and memory files in `data/` are yours — readable, portable, and deletable at any time.
+
+## Documentation
+
+For architecture details, directory layout, and design decisions, see [docs/](docs/).
 
 ---
 
