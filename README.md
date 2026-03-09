@@ -12,11 +12,11 @@ cd agent-persona
 ./scripts/install.sh ~/path/to/your/project
 ```
 
-Open your project in Cursor and say hi. That's it.
-
 ### First Conversation
 
-Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally, like you would with a colleague.
+Open your project in Cursor and say hi. That's it.
+
+ Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally, like you would with a colleague.
 
 ### Switching Communication Style
 
