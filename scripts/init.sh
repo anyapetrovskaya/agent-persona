@@ -94,6 +94,15 @@ if [ -f "$AP_DIR/rules/agent-persona.mdc" ]; then
   RULE_STATUS="Agent rule installed"
 fi
 
+# ── Fix paths for flat repo structure ────────────────────────────────────────
+
+if [ "$AP_DIR" = "$REPO_ROOT" ]; then
+  sed -i 's|agent-persona/||g' "$REPO_ROOT/.cursor/rules/agent-persona.mdc" 2>/dev/null || true
+  for f in "$AP_DIR/tasks/"*.md; do
+    [ -f "$f" ] && sed -i 's|agent-persona/||g' "$f"
+  done
+fi
+
 # ── Handle --web mode ────────────────────────────────────────────────────────
 
 CONFIG_STATUS=""
