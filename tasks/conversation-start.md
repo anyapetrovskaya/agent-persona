@@ -6,74 +6,59 @@ You are the startup sub-agent. Execute all steps and return a single compact rep
 
 The main agent passes: **user's first message** (for mode detection) and **current time** (HH:MM).
 
+**Parallel reads:** Read ALL files listed in each batch using multiple Read tool calls in a SINGLE response. Do not read them one at a time.
+
 ## Steps
 
-### 0a. First-run check (do this FIRST, before anything else)
+### 1. Batch 1 — config, personality source, base persona
 
-Check if the file `agent-persona/data/.first_run` exists. If it does NOT exist → skip to step 0b and continue the normal flow.
+Read in parallel:
+- `agent-persona/config.json`
+- `agent-persona/data/active_personality.txt`
+- `agent-persona/data/base_persona.json`
 
-If `.first_run` EXISTS:
-
-1. Delete `agent-persona/data/.first_run`.
-2. Compute the next proactive save boundary (same logic as step 4).
-3. Read `agent-persona/personalities/supportive.md` and extract its directive.
-4. **Stop here.** Skip ALL other steps. Return the first-run onboarding report (see "First-run onboarding report format" below) and exit.
-
-### 0b. Detect mode
-
-From the user message: "anon mode" → **anon**, "standalone mode" → **standalone**, "debug on" → note debug flag, else **default**.
+**Detect mode** from the user message: "anon mode" → **anon**, "standalone mode" → **standalone**, "debug on" → note debug flag, else **default**.
 - **anon:** Reads OK, no writes. Skip consolidation, proactive-initiative, suggest-learned-behavior.
 - **standalone:** Skip handoff. Episodic: own file only.
 
-### 0c. Git sync (pull)
+**Resolve personality:**
+- If `active_personality.txt` has content → personality = that id.
+- Else → personality = `default_mode` from `base_persona.json`.
+- If `base_persona.json` missing → personality = `expert-laconic`.
 
-Read `agent-persona/config.json`. If `git_sync` is `true`, run `git pull` to fetch the latest data from the remote before loading anything. If the file is missing or `git_sync` is `false` or not present, skip this step silently.
+**Git sync:** If `config.json` has `git_sync: true`, run `git pull` before continuing to batch 2. Otherwise skip silently.
 
-### 1. Load handoff
+### 2. Batch 2 — session data, personality file, knowledge
 
-- **standalone:** Skip.
-- **default/anon:** Read `agent-persona/data/current_session_handoff.md` if it exists. Extract:
-  - Current topic / goal (1–2 lines)
-  - Key decisions (bullet list, keep short)
-  - Latest episode id
-  - Reminders (from "Reminder for user" section, with times)
-- If the file is missing or empty, that's fine — report "No previous session" under Handoff context. Don't error.
+Read in parallel (skip items as noted):
+- `agent-persona/data/current_session_handoff.md` — skip if **standalone**
+- `agent-persona/personalities/<personality>.md` — using personality id from step 1
+- `agent-persona/data/procedural_notes.json`
+- `agent-persona/data/knowledge/knowledge.json` — skip if **anon**
+- `agent-persona/data/last_proactive_save.txt`
+- `agent-persona/data/learned_triggers.json` — skip if **anon**
+- `agent-persona/data/eval/eval_log.json`
 
-### 2. Resolve personality
+### 3. Process loaded data
 
-Read `agent-persona/data/active_personality.txt` (may not exist). Read `agent-persona/data/base_persona.json`.
-- If `active_personality.txt` has content → mode = that id.
-- Else → mode = `default_mode` from `base_persona.json`.
-- If `base_persona.json` missing → mode = `expert-laconic`.
+**Personality directive:** Extract directive (tone, verbosity, role lines) from `<personality>.md`. Note base traits from `base_persona.json`.
 
-Read `agent-persona/personalities/<mode>.md`. Extract the directive (tone, verbosity, role lines). Also note base traits from `base_persona.json`.
+**Handoff:** If loaded, extract: current topic/goal (1–2 lines), key decisions (bullet list), latest episode id, reminders (with times). If missing or empty → "No previous session."
 
-### 2b. Load procedural notes
+**Procedural notes:** Collect notes with status `active` as behavioral guidance. Collect `pending_approval` notes separately for user approval.
 
-Read `agent-persona/data/procedural_notes.json` if it exists. Collect notes with status `active` — these are behavioral guidance the agent should follow this session. If any notes have status `pending_approval`, collect them separately so the main agent can present them to the user for approval.
+**Consolidation:** Compare `last_infer_date` from `knowledge.json` to today. Consolidation is due only if `last_infer_date` is more than 1 day old (end-of-day consolidation was missed). Skip if **anon** or if current/missing.
 
-### 3. Consolidation
-
-Read `last_infer_date` from `agent-persona/data/knowledge/knowledge.json`. Compare to today.
-- If `last_infer_date` is older than today → consolidation is due. However, if end-of-day consolidation was run last night (last_infer_date = yesterday or today), skip it. Only run at startup if last_infer_date is more than 1 day old (i.e., end-of-day consolidation was missed).
-- If mode is **anon** → skip regardless.
-- If current or missing field → skip (up to date).
-
-### 4. Proactive save boundary
-
-Read `agent-persona/data/last_proactive_save.txt` if it exists (single line like `18:15`). Compute the current 15-min boundary from current time:
+**Proactive save boundary:** From `last_proactive_save.txt` (single line like `18:15`), compute the current 15-min boundary:
 - Minutes 0–14 → `:00`, 15–29 → `:15`, 30–44 → `:30`, 45–59 → `:45`
+- If file missing or stored boundary < current boundary → next save = current boundary + 15 min.
+- Otherwise → next save = stored boundary + 15 min.
 
-If file is missing or stored boundary < current boundary → next save = current boundary + 15 min.
-Otherwise → next save = stored boundary + 15 min.
+**Proactive initiative:** If not **anon** and `learned_triggers.json` has a `conversation_start` trigger with a message, include it.
 
-### 5. Optional: proactive initiative
+### 4. Eval logging
 
-If not anon, read `agent-persona/data/learned_triggers.json` (if it exists). Check for `conversation_start` trigger. If it has a message, include it. Otherwise skip.
-
-### 6. Eval logging
-
-Append an eval event to `agent-persona/data/eval/eval_log.json`. Read the file (create with `{"schema_version": 1, "events": []}` if missing), then append to the `events` array:
+Append to `agent-persona/data/eval/eval_log.json` (create with `{"schema_version": 1, "events": []}` if missing):
 ```json
 {
   "id": "evt_<ISO-timestamp>",
@@ -81,15 +66,15 @@ Append an eval event to `agent-persona/data/eval/eval_log.json`. Read the file (
   "type": "handoff_check",
   "data": {
     "handoff_existed": true or false,
-    "items_referenced": "<count of bullet points/items noted from handoff>",
+    "items_referenced": "<count of items noted from handoff>",
     "self_assessed_useful": true or false,
     "mode": "<anon|standalone|default>"
   }
 }
 ```
-Self-assess usefulness: `true` if the handoff contained context relevant to the user's first message; `false` if empty, missing, or unrelated to what the user is asking about. If mode is `standalone` (no handoff loaded), set `handoff_existed` and `self_assessed_useful` to `false`. If eval logging fails, skip silently.
+Self-assess usefulness: `true` if handoff contained context relevant to the user's first message; `false` if empty, missing, or unrelated. If **standalone**, set both `handoff_existed` and `self_assessed_useful` to `false`. If eval logging fails, skip silently.
 
-## Report format
+### 5. Return report
 
 Return EXACTLY this structure (omit sections only if truly empty):
 
@@ -108,33 +93,10 @@ Return EXACTLY this structure (omit sections only if truly empty):
 **Reminders:** <"none" or list with times>
 **Next proactive save:** HH:MM
 **Consolidation:** up to date | ran (summary: +N/-N items, base persona: <mode>)
+**Tool calls:** <N> (count of Read/Write/Shell tool calls you made)
 ```
 
 If mode is anon, add: `**Anon:** reads OK, no writes.`
 
 Keep the entire report under 30 lines.
-
-## First-run onboarding report format
-
-Returned ONLY when `.first_run` was detected in step 0a. No other steps are run.
-
-```
-**Mode:** first-run-onboarding
-**Personality:** supportive (default for new users)
-**Directive:** <directive from supportive.md>
-
-**FIRST RUN — Onboarding required.**
-Reply with this message EXACTLY (no changes, no additions, no preamble):
-
-Hey — I'll remember our conversations and learn how you like to work over time. Think of me as the assistant you wish you had — tell me what you need and I'll grow into that role. If you ever want me to adjust my style, just say so.
-
-What's on your mind?
-
-Do NOT mention: setup wizards, feature lists, configuration, technical internals (memory systems, knowledge graphs, etc.), or coding/programming unless the user brings it up first.
-Do NOT be sycophantic.
-
-If the user asks follow-up questions about what agent-persona is or how it works, keep your answer to 2-3 sentences max. Point them to the docs: "There's a full walkthrough in agent-persona/docs/README.md if you want the details." Don't recite feature lists or explain technical internals.
-
-After the introduction, proceed normally — help with whatever they need.
-Next proactive save: <HH:MM>
-```
+If `debug: true` was passed, include the Tool calls line. Otherwise omit it.

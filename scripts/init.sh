@@ -63,6 +63,27 @@ if [ "$SEEDED" = true ]; then
   touch "$AP_DIR/data/.first_run"
 fi
 
+# ── Detect timezone ──────────────────────────────────────────────────────────
+
+DETECTED_TZ="UTC"
+if command -v timedatectl &>/dev/null; then
+  DETECTED_TZ=$(timedatectl show -p Timezone --value 2>/dev/null || echo "UTC")
+elif [ -f /etc/timezone ]; then
+  DETECTED_TZ=$(cat /etc/timezone)
+elif [ -L /etc/localtime ]; then
+  DETECTED_TZ=$(readlink /etc/localtime | sed 's|.*/zoneinfo/||')
+fi
+DETECTED_TZ="${DETECTED_TZ:-UTC}"
+
+CONFIG="$AP_DIR/config.json"
+if [ -f "$CONFIG" ]; then
+  if grep -q '"timezone"' "$CONFIG"; then
+    sed -i "s|\"timezone\": \"[^\"]*\"|\"timezone\": \"$DETECTED_TZ\"|" "$CONFIG"
+  else
+    sed -i "s|}$|,\n  \"timezone\": \"$DETECTED_TZ\"\n}|" "$CONFIG"
+  fi
+fi
+
 # ── Set up Cursor rules ─────────────────────────────────────────────────────
 
 mkdir -p "$REPO_ROOT/.cursor/rules"
@@ -107,5 +128,6 @@ echo "  .cursor/rules/ $RULE_STATUS"
 if [ -n "$CONFIG_STATUS" ]; then
   echo "  config         $CONFIG_STATUS"
 fi
+echo "  timezone      $DETECTED_TZ"
 echo ""
 echo "Open this folder in Cursor and say hi."

@@ -25,3 +25,5 @@ You are the per-turn-check sub-agent. Run lightweight checks each turn and retur
 Reminders: <reminder text or "none">
 Save due: <yes/no> (next: HH:MM)
 ```
+
+If `debug: true` was passed, add: `Tool calls: N`
