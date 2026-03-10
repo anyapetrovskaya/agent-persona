@@ -22,6 +22,8 @@ for arg in "$@"; do
   esac
 done
 
+USERNAME="${USERNAME%-agent-persona}"
+
 if [ -z "$USERNAME" ]; then
   echo "Usage: $0 <username> [--force]" >&2
   echo "  username: lowercase alphanumeric + hyphens" >&2
