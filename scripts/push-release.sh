@@ -15,6 +15,12 @@ if [ ! -d "$RELEASE_DIR/.git" ]; then
   exit 1
 fi
 
+# ── Sync live rule to template ──────────────────────────────────────────────
+WORKSPACE_RULE="$SOURCE_DIR/../.cursor/rules/agent-persona.mdc"
+if [ -f "$WORKSPACE_RULE" ]; then
+  cp "$WORKSPACE_RULE" "$SOURCE_DIR/rules/agent-persona.mdc"
+fi
+
 # ── Remove old content (preserve .git) ───────────────────────────────────────
 cd "$RELEASE_DIR"
 find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} + 2>/dev/null || true

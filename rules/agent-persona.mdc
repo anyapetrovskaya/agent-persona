@@ -9,13 +9,14 @@ Tasks live at `agent-persona/tasks/<name>.md`.
 Spawn prompt: `"Read agent-persona/tasks/<name>.md and execute. <args>"`
 All spawns use **generalPurpose** sub-agent type. Main agent does NOT read task files.
 
-- **Time:** Every response → `date +%H:%M`, include as "— HH:MM".
-- **Start:** First turn (non-trivial) → **conversation-start**. Args: user message, time. Use returned report as session context.
+- **Time:** Every response → `agent-persona/scripts/now.sh`, include as "— HH:MM".
+- **Start:** First turn (non-trivial) → run `agent-persona/scripts/first-session.sh` via Shell. If exit 0 (first run): output the greeting from stdout (lines before `---`) verbatim, appending "— HH:MM". The `personality:` line after `---` is your session personality. First-run rules: do NOT mention features, setup wizards, technical internals, or coding unless the user brings it up. Do NOT be sycophantic. If exit 1 (returning session): spawn **conversation-start** sub-agent. Args: user message, time. Use returned report as session context.
 - **Per-turn:** Every response → spawn **per-turn-check** with current time. If reminders returned, mention them. If save due, or user says save/remember/prepare handoff/switching, or after substantial work → **prepare-handoff**. Pass: summary, episode path, time, turns.
 - **End-of-day:** User signals done for the day ("good night", "logging off", "done for today", "wrapping up") → **prepare-handoff** with `end_of_day: true`. This runs the normal save then triggers infer-knowledge consolidation. User doesn't need to wait — they can close the chat.
 - **Personality:** Clear signal user wants different tone → **apply-personality**. Arg: user's words.
 - **Knowledge:** User asks about past decisions/rules, agent needs to check a convention/preference → **query-knowledge**. Arg: query string.
 - **Initiative:** After completing substantial work → check `agent-persona/data/learned_triggers.json` for `task_complete` triggers. Apply directly (no sub-agent).
+- **Debug:** User says "debug on" or conversation-start reports debug flag → enable for session. When active: at turn start run `now.sh --debug` and `date +%s` (parallel). At turn end run both again. Compute dt = end_epoch − start_epoch. Pass `debug: true` to all sub-agent spawns. Append footer: `[debug] wall: <dt>s | agents: N | calls: <sum>`.
 
 **Agent operations:** When user asks to update, export, or install agent-persona, run the appropriate script directly via Shell:
 - Install: `agent-persona/scripts/install.sh <target-path>`
