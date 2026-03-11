@@ -4,8 +4,9 @@
 # Usage:
 #   ./scripts/setup-web-user.sh <username>
 #
-# Creates a private GitHub repo anyapetrovskaya/<username>-agent-persona
-# with agent-persona initialized in --web mode, ready for Cursor Web.
+# Creates ~/cursor/<username>-agent-persona/ as the outer project,
+# clones agent-persona nested inside it, runs init, applies web config,
+# then pushes to a private GitHub repo anyapetrovskaya/<username>-agent-persona.
 
 set -euo pipefail
 
@@ -47,21 +48,33 @@ if [ -d "$WORK_DIR" ]; then
   exit 1
 fi
 
-# ── Clone source repo ───────────────────────────────────────────────────────
+# ── Create outer project directory ───────────────────────────────────────────
 
-echo "Cloning agent-persona into $WORK_DIR ..."
-git clone "$SOURCE_REPO" "$WORK_DIR"
+echo "Creating project directory $WORK_DIR ..."
+mkdir "$WORK_DIR"
 cd "$WORK_DIR"
 
-# ── Initialize for web ──────────────────────────────────────────────────────
+# ── Clone agent-persona nested inside ────────────────────────────────────────
 
-echo "Running init.sh --web ..."
-bash scripts/init.sh --web
+echo "Cloning agent-persona into $WORK_DIR/agent-persona ..."
+git clone "$SOURCE_REPO" agent-persona
+rm -rf agent-persona/.git
 
-# ── Create private repo and push ────────────────────────────────────────────
+# ── Initialize agent-persona ─────────────────────────────────────────────────
+
+echo "Running init.sh ..."
+bash agent-persona/scripts/init.sh
+
+# ── Apply web-specific config ────────────────────────────────────────────────
+
+echo "Applying web configuration ..."
+sed -i 's/"git_sync": false/"git_sync": true/' agent-persona/config.json
+sed -i 's/"default_mode": "[^"]*"/"default_mode": "open-to-anything"/' agent-persona/data/base_persona.json
+printf 'open-to-anything\n' > agent-persona/data/active_personality.txt
+
+# ── Create repo and push ────────────────────────────────────────────────────
 
 echo "Creating private repo anyapetrovskaya/$REPO_NAME ..."
-rm -rf .git
 git init
 git add -A
 git commit -m "Initial agent-persona setup for $USERNAME"
@@ -73,6 +86,7 @@ echo ""
 echo "Done! Agent-persona set up for: $USERNAME"
 echo ""
 echo "  Repo:    github.com/anyapetrovskaya/$REPO_NAME"
+echo "  Layout:  $REPO_NAME/agent-persona/ (nested)"
 echo "  Access:  Private -- add $USERNAME as collaborator if needed"
 echo "  Usage:   Open in Cursor Web, select Opus 4.6, and start chatting"
 echo ""

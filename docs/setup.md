@@ -13,42 +13,40 @@ Get agent-persona running in your project from scratch.
 
 ## 2. Installation
 
-Install agent-persona into a target project by running the install script from the agent-persona source (e.g. a repo checkout):
+1. **Clone the repo into your project:**
 
 ```bash
-agent-persona/scripts/install.sh <target-path>
+cd /path/to/your-project
+git clone https://github.com/anyapetrovskaya/agent-persona.git agent-persona
 ```
 
-**Examples:**
+2. **Run init.sh:**
 
 ```bash
-# Install into your current project
-agent-persona/scripts/install.sh .
-
-# Install into a specific project
-agent-persona/scripts/install.sh /path/to/my-project
+bash agent-persona/scripts/init.sh
 ```
 
 The script:
 
-- Copies the `agent-persona/` folder into the target project
+- Seeds initial data (personality, knowledge, triggers, conversations)
 - Creates the Cursor rule at `.cursor/rules/agent-persona.mdc`
-- Seeds initial data on a fresh install (personality, knowledge, triggers)
-- Adds `agent-persona/` to the target project's `.gitignore`
+- Adds `agent-persona/` to the project's `.gitignore`
+- Detects timezone
 
-**Important:** You cannot install into the agent-persona source directory itself. The target must be a different project.
+**Note:** The older `install.sh` script is deprecated. Use the clone + init flow above.
 
 ---
 
 ## 3. What Gets Installed
 
-After installation, your target project will contain:
+After installation, your project will contain:
 
 | Path | Contents |
 |------|----------|
 | `agent-persona/` | Framework and your data |
+| `agent-persona/.git/` | Inner git repo for receiving updates (when cloned) |
 | `agent-persona/tasks/` | Task directories with pipeline scripts (task.sh, task.md, pre.sh, post.sh) |
-| `agent-persona/scripts/` | Install, update, export, and visualization scripts |
+| `agent-persona/scripts/` | Init, update, export, and visualization scripts |
 | `agent-persona/data/` | Episodic memory, knowledge graph, persona, triggers |
 | `agent-persona/data/conversations/` | Named conversation threads |
 | `agent-persona/docs/` | Documentation |
@@ -64,23 +62,21 @@ The Cursor rule tells the agent when to run tasks (e.g. at conversation start, p
 
 To update an existing installation with newer framework files (tasks, scripts, rules, docs) without touching your data:
 
-```bash
-agent-persona/scripts/update.sh --source <path-to-agent-persona-repo>
-```
-
-**Example:**
+**Method 1 — Project installs (agent-persona/ has its own .git/):**
 
 ```bash
-# From your project root (with agent-persona installed)
-./agent-persona/scripts/update.sh --source /path/to/agent-persona-repo
+cd /path/to/your-project/agent-persona
+git pull
+bash scripts/init.sh
 ```
 
-The update script:
+**Method 2 — Any install (self-contained, works even without inner .git):**
 
-- Updates task directories (including pipeline scripts), scripts, rules, docs, and default personalities
-- **Does not modify** your episodic memory, knowledge, base persona, triggers, or conversation threads
-- Can remove files that no longer exist in the source
-- Supports `--dry-run` to preview changes without applying them
+```bash
+bash agent-persona/scripts/update.sh
+```
+
+The update script clones the latest release, syncs framework files (tasks, scripts, docs, rules, personalities), never touches your data, and re-runs init. Supports `--dry-run` to preview changes without applying them.
 
 ---
 

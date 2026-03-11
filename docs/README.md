@@ -43,54 +43,7 @@ When the user signals they're done ("good night", "logging off", "done for today
 
 ---
 
-## Key concepts
-
-| Concept | Definition |
-|--------|------------|
-| **Episodic memory** | Per-session snapshots: what happened, what was discussed, what was decided. Stored as JSON episodes, archived when superseded. |
-| **Knowledge** | Consolidated facts and preferences extracted from many sessions. Durable, queryable. Grows via infer-knowledge at end-of-day. |
-| **Base persona** | Numeric trait values (warmth, verbosity, humor, etc.) that define the agent's default communication style. |
-| **Personality presets** | Named styles like "expert-laconic" or "bubbly-chatty". User can request a different tone; **apply-personality** switches the preset. |
-| **Procedural notes** | User-approved behavioral rules. Things the agent should always or never do, learned from feedback. |
-| **Tasks** | Task directories in `tasks/`. Each contains a pipeline: `task.sh` (entry), `task.md` (instructions), and optional `pre.sh`/`post.sh` scripts. The main agent runs `task.sh`; sub-agents handle the rest. |
-| **Named conversations** | Persistent named threads in `data/conversations/`. Save, load, create, and list conversation threads. Loading a conversation forks it — future saves go to that thread. |
-| **Session-scoped staging** | Each chat session gets a unique ID. Temporary files are namespaced under `.staging/<session-id>/` to prevent conflicts when multiple chats share a workspace. |
-
----
-
-## Directory layout
-
-```
-agent-persona/
-├── data/                        # Runtime data
-│   ├── conversations/           # Named conversation threads
-│   │   ├── _default.md          # Default conversation (fallback)
-│   │   └── <name>.md            # Named threads
-│   ├── episodic/                # Per-session episode JSON files
-│   │   └── archived/            # Consolidated episodes
-│   ├── knowledge/               # Knowledge store + memory graph
-│   ├── personalities/           # Base persona + personality presets
-│   ├── eval/                    # Evaluation outputs
-│   ├── .staging/                # Temp files (session-scoped)
-│   └── *.json / *.md            # Config, handoff, triggers, etc.
-├── docs/                        # Documentation (you are here)
-├── rules/                       # Cursor rule template
-├── scripts/                     # Install, update, export, release utilities
-└── tasks/                       # Task directories (pipeline architecture)
-    ├── conversation-start/      # Load context at session start
-    │   ├── task.sh              # Entry point (main agent runs this)
-    │   ├── task.md              # Instructions for sub-agent
-    │   ├── pre.sh               # Gather context
-    │   └── post.sh              # (optional) Write results
-    ├── prepare-handoff/         # Save episodic memory + handoff
-    ├── manage-conversation/     # Named conversation management
-    ├── per-turn-check/          # Per-turn timing, reminders, footer
-    ├── query-knowledge/         # On-demand knowledge retrieval
-    ├── apply-personality/       # Switch personality preset
-    ├── reflect/                 # Self-evaluation
-    ├── infer-knowledge/         # End-of-day knowledge consolidation
-    └── ...                      # Other task directories
-```
+For key concepts, directory layout, and implementation details, see [architecture.md](architecture.md).
 
 ---
 

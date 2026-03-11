@@ -3,7 +3,6 @@
 #
 # Usage:
 #   ./agent-persona/scripts/init.sh
-#   ./agent-persona/scripts/init.sh --web
 
 set -euo pipefail
 
@@ -15,24 +14,20 @@ REPO_ROOT="$(cd "$AP_DIR" && git rev-parse --show-toplevel 2>/dev/null || echo "
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
-WEB_MODE=false
-
 for arg in "$@"; do
   case "$arg" in
-    --web) WEB_MODE=true ;;
     -h|--help)
-      echo "Usage: $0 [--web]"
+      echo "Usage: $0"
       echo ""
       echo "Initializes agent-persona for in-place use."
       echo ""
       echo "Flags:"
-      echo "  --web        Set up for Cursor Web (enables git sync, open-to-anything personality)"
       echo "  -h, --help   Show this help message"
       exit 0
       ;;
     *)
       echo "Error: unknown argument: $arg" >&2
-      echo "Usage: $0 [--web]" >&2
+      echo "Usage: $0" >&2
       exit 1
       ;;
   esac
@@ -117,49 +112,33 @@ if [ -f "$AP_DIR/rules/agent-persona.mdc" ]; then
   RULE_STATUS="Agent rule installed"
 fi
 
-# ── Fix paths for flat repo structure ────────────────────────────────────────
+# ── Update parent .gitignore ─────────────────────────────────────────────────
 
-if [ "$AP_DIR" = "$REPO_ROOT" ]; then
-  sed -i 's|agent-persona/||g' "$REPO_ROOT/.cursor/rules/agent-persona.mdc" 2>/dev/null || true
-  for f in "$AP_DIR/tasks/"*.md; do
-    [ -f "$f" ] && sed -i 's|agent-persona/||g' "$f"
-  done
-fi
-
-# ── Handle --web mode ────────────────────────────────────────────────────────
-
-CONFIG_STATUS=""
-if [ "$WEB_MODE" = true ]; then
-  CONFIG="$AP_DIR/config.json"
-  if [ -f "$CONFIG" ]; then
-    sed -i 's/"git_sync": false/"git_sync": true/' "$CONFIG"
+if [ "$AP_DIR" != "$REPO_ROOT" ]; then
+  GITIGNORE="$REPO_ROOT/.gitignore"
+  ENTRY="agent-persona/"
+  if [ -f "$GITIGNORE" ]; then
+    if ! grep -qxF "$ENTRY" "$GITIGNORE"; then
+      printf '\n%s\n' "$ENTRY" >> "$GITIGNORE"
+      echo "Added $ENTRY to .gitignore"
+    fi
   else
-    echo '{"git_sync": true}' > "$CONFIG"
+    printf '%s\n' "$ENTRY" > "$GITIGNORE"
+    echo "Created .gitignore with $ENTRY"
   fi
-  CONFIG_STATUS="git_sync: true"
-
-  # Set default personality to open-to-anything
-  PERSONA="$AP_DIR/data/base_persona.json"
-  if [ -f "$PERSONA" ]; then
-    sed -i 's/"default_mode": "[^"]*"/"default_mode": "open-to-anything"/' "$PERSONA"
-  fi
-
-  # Set active personality
-  echo "open-to-anything" > "$AP_DIR/data/active_personality.txt"
-
-  CONFIG_STATUS="git_sync: true, personality: open-to-anything"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 echo ""
-echo "agent-persona initialized."
+if [ "$SEEDED" = true ]; then
+  echo "agent-persona initialized (fresh install)."
+else
+  echo "agent-persona re-initialized (framework update)."
+fi
 echo ""
 echo "  data/          $DATA_STATUS"
 echo "  .cursor/rules/ $RULE_STATUS"
-if [ -n "$CONFIG_STATUS" ]; then
-  echo "  config         $CONFIG_STATUS"
-fi
-echo "  timezone      $DETECTED_TZ"
+echo "  timezone       $DETECTED_TZ"
 echo ""
 echo "Open this folder in Cursor and say hi."

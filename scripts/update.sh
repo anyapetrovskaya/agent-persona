@@ -1,42 +1,38 @@
 #!/usr/bin/env bash
-# update.sh — Update agent-persona framework files without touching user data.
+# update.sh — Self-contained agent-persona framework update.
+#
+# Clones the latest release, syncs framework files, and re-runs init.
+# User data is never touched.
 #
 # Usage:
-#   ./update.sh --source /path/to/agent-persona-repo
-#   ./agent-persona/scripts/update.sh                    # from a project with agent-persona installed
-#
-# Flags:
-#   --source DIR   Path to the agent-persona source (repo checkout)
-#   --dry-run      Show what would change without making changes
+#   bash agent-persona/scripts/update.sh
+#   bash agent-persona/scripts/update.sh --dry-run
 
 set -euo pipefail
 
+RELEASE_REPO="https://github.com/anyapetrovskaya/agent-persona.git"
+
 # ── Defaults ──────────────────────────────────────────────────────────────────
-SOURCE_DIR=""
 DRY_RUN=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLONE_DIR=""
 
-# Default personalities shipped with the framework
 DEFAULT_PERSONALITIES="bubbly-chatty.md concise-unbiased.md critic.md expert-laconic.md supportive.md README.md"
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --source)
-      SOURCE_DIR="$2"
-      shift 2
-      ;;
     --dry-run)
       DRY_RUN=true
       shift
       ;;
     -h|--help)
-      echo "Usage: $0 [--source DIR] [--dry-run]"
+      echo "Usage: $0 [--dry-run]"
       echo ""
-      echo "Update agent-persona framework files in the current project."
+      echo "Update agent-persona framework files from the latest release."
+      echo "User data (data/, config.json) is never touched."
       echo ""
       echo "Options:"
-      echo "  --source DIR   Path to agent-persona source repo"
       echo "  --dry-run      Show what would change without modifying anything"
       echo "  -h, --help     Show this help"
       exit 0
@@ -49,83 +45,67 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ── Locate target project ────────────────────────────────────────────────────
-# The target is the project we're updating. If this script lives inside
-# agent-persona/scripts/, the target is two levels up. Otherwise, look
-# for agent-persona/ in the current directory.
-
-TARGET_DIR=""
-if [[ -d "$SCRIPT_DIR/../tasks" && -d "$SCRIPT_DIR/../data" ]]; then
-  # Script is running from inside agent-persona/scripts/
-  TARGET_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-elif [[ -d "./agent-persona/tasks" ]]; then
-  TARGET_DIR="$(pwd)"
+# ── Resolve paths ────────────────────────────────────────────────────────────
+# Script lives in agent-persona/scripts/, so AP_DIR is one level up.
+if [[ -d "$SCRIPT_DIR/../tasks" && -d "$SCRIPT_DIR/../scripts" ]]; then
+  AP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 else
-  echo "Error: Cannot find agent-persona/ in current directory." >&2
-  echo "Run this script from a project root that has agent-persona/ installed," >&2
-  echo "or run it as ./agent-persona/scripts/update.sh" >&2
+  echo "Error: Cannot locate agent-persona/ directory from script path." >&2
+  echo "Expected tasks/ and scripts/ alongside this script's parent." >&2
   exit 1
 fi
 
-AP_DIR="$TARGET_DIR/agent-persona"
+# ── Cleanup trap ─────────────────────────────────────────────────────────────
+cleanup() {
+  if [[ -n "$CLONE_DIR" && -d "$CLONE_DIR" ]]; then
+    rm -rf "$CLONE_DIR"
+  fi
+}
+trap cleanup EXIT
 
-# ── Locate source ────────────────────────────────────────────────────────────
-if [[ -z "$SOURCE_DIR" ]]; then
-  echo "============================================================"
-  echo "  agent-persona update"
-  echo "============================================================"
-  echo ""
-  echo "No --source specified."
-  echo ""
-  echo "To update, provide the path to an agent-persona repo checkout:"
-  echo ""
-  echo "  $0 --source /path/to/agent-persona-repo"
-  echo ""
-  echo "You can get the latest source with:"
-  echo ""
-  echo "  git clone https://github.com/USER/agent-persona.git /tmp/agent-persona"
-  echo "  $0 --source /tmp/agent-persona"
-  echo ""
-  exit 1
-fi
-
-# Validate source directory
-if [[ ! -d "$SOURCE_DIR/agent-persona/tasks" ]]; then
-  echo "Error: Source directory does not look like an agent-persona repo." >&2
-  echo "Expected to find agent-persona/tasks/ in: $SOURCE_DIR" >&2
-  exit 1
-fi
-
-# ── Read current version ─────────────────────────────────────────────────────
-VERSION_FILE="$TARGET_DIR/.framework-version"
-CURRENT_VERSION="unknown"
-if [[ -f "$VERSION_FILE" ]]; then
-  CURRENT_VERSION="$(cat "$VERSION_FILE")"
-fi
-
-SOURCE_VERSION="unknown"
-if [[ -f "$SOURCE_DIR/.framework-version" ]]; then
-  SOURCE_VERSION="$(cat "$SOURCE_DIR/.framework-version")"
-fi
+# ── Clone release repo ───────────────────────────────────────────────────────
+CLONE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agent-persona-update.XXXXXX")"
 
 echo "============================================================"
 echo "  agent-persona update"
 echo "============================================================"
 echo ""
-echo "  Target:          $TARGET_DIR"
-echo "  Source:           $SOURCE_DIR"
-echo "  Current version: $CURRENT_VERSION"
-echo "  Source version:   $SOURCE_VERSION"
+echo "  Target:   $AP_DIR"
+echo "  Source:    $RELEASE_REPO"
 if $DRY_RUN; then
-  echo "  Mode:            DRY RUN (no changes will be made)"
+  echo "  Mode:     DRY RUN (no changes will be made)"
 fi
 echo ""
 
-# ── Helper: copy with reporting ──────────────────────────────────────────────
-UPDATED_COUNT=0
-SKIPPED_COUNT=0
+echo "Cloning latest release..."
+if ! git clone --depth 1 --quiet "$RELEASE_REPO" "$CLONE_DIR" 2>/dev/null; then
+  echo "Error: Failed to clone $RELEASE_REPO" >&2
+  echo "Check your network connection and try again." >&2
+  exit 1
+fi
+echo "  done."
+echo ""
 
-copy_file() {
+# Determine source layout — the clone may have agent-persona/ as a subdirectory
+# or may itself be the agent-persona directory.
+if [[ -d "$CLONE_DIR/agent-persona/tasks" ]]; then
+  SOURCE_AP="$CLONE_DIR/agent-persona"
+elif [[ -d "$CLONE_DIR/tasks" ]]; then
+  SOURCE_AP="$CLONE_DIR"
+else
+  echo "Error: Cloned repo does not look like an agent-persona release." >&2
+  echo "Expected tasks/ directory inside the clone." >&2
+  exit 1
+fi
+
+# ── Counters ─────────────────────────────────────────────────────────────────
+ADDED_COUNT=0
+UPDATED_COUNT=0
+REMOVED_COUNT=0
+UNCHANGED_COUNT=0
+
+# ── Helper: sync a single file with reporting ───────────────────────────────
+sync_file() {
   local src="$1"
   local dst="$2"
   local label="$3"
@@ -134,101 +114,147 @@ copy_file() {
     return
   fi
 
-  # Check if file differs
   if [[ -f "$dst" ]] && diff -q "$src" "$dst" > /dev/null 2>&1; then
-    SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+    UNCHANGED_COUNT=$((UNCHANGED_COUNT + 1))
     return
   fi
 
-  local past_action="updated"
-  local inf_action="update"
-  if [[ ! -f "$dst" ]]; then
-    past_action="added"
-    inf_action="add"
+  if [[ -f "$dst" ]]; then
+    if $DRY_RUN; then
+      echo "  [dry-run] would update: $label"
+    else
+      cp "$src" "$dst"
+      echo "  updated: $label"
+    fi
+    UPDATED_COUNT=$((UPDATED_COUNT + 1))
+  else
+    if $DRY_RUN; then
+      echo "  [dry-run] would add: $label"
+    else
+      mkdir -p "$(dirname "$dst")"
+      cp "$src" "$dst"
+      echo "  added: $label"
+    fi
+    ADDED_COUNT=$((ADDED_COUNT + 1))
   fi
 
-  if $DRY_RUN; then
-    echo "  [dry-run] would $inf_action: $label"
-  else
-    mkdir -p "$(dirname "$dst")"
-    cp "$src" "$dst"
-    echo "  $past_action: $label"
+  if ! $DRY_RUN && [[ -x "$src" ]]; then
+    chmod +x "$dst"
   fi
-  UPDATED_COUNT=$((UPDATED_COUNT + 1))
 }
 
-# ── 1. Tasks ─────────────────────────────────────────────────────────────────
-echo "Tasks (agent-persona/tasks/):"
+# ── Helper: remove a file/dir with reporting ─────────────────────────────────
+remove_path() {
+  local path="$1"
+  local label="$2"
 
-# Sync task directories (pipeline architecture)
-for src_dir in "$SOURCE_DIR"/agent-persona/tasks/*/; do
+  if $DRY_RUN; then
+    echo "  [dry-run] would remove: $label (no longer in source)"
+  else
+    rm -rf "$path"
+    echo "  removed: $label (no longer in source)"
+  fi
+  REMOVED_COUNT=$((REMOVED_COUNT + 1))
+}
+
+# ── 1. Tasks (recursive) ─────────────────────────────────────────────────────
+echo "Tasks (tasks/):"
+
+for src_dir in "$SOURCE_AP"/tasks/*/; do
   [[ -d "$src_dir" ]] || continue
   dir_name="$(basename "$src_dir")"
-  mkdir -p "$AP_DIR/tasks/$dir_name"
+  $DRY_RUN || mkdir -p "$AP_DIR/tasks/$dir_name"
+
   for src_file in "$src_dir"*; do
     [[ -f "$src_file" ]] || continue
     base="$(basename "$src_file")"
-    copy_file "$src_file" "$AP_DIR/tasks/$dir_name/$base" "tasks/$dir_name/$base"
-    if ! $DRY_RUN && [[ -x "$src_file" ]]; then
-      chmod +x "$AP_DIR/tasks/$dir_name/$base"
-    fi
+    sync_file "$src_file" "$AP_DIR/tasks/$dir_name/$base" "tasks/$dir_name/$base"
   done
+
+  # Remove files inside this task dir that no longer exist in source
+  if [[ -d "$AP_DIR/tasks/$dir_name" ]]; then
+    for dst_file in "$AP_DIR/tasks/$dir_name/"*; do
+      [[ -f "$dst_file" ]] || continue
+      base="$(basename "$dst_file")"
+      if [[ ! -f "$src_dir/$base" ]]; then
+        remove_path "$dst_file" "tasks/$dir_name/$base"
+      fi
+    done
+  fi
 done
 
 # Remove task directories that no longer exist in source
 for dst_dir in "$AP_DIR"/tasks/*/; do
   [[ -d "$dst_dir" ]] || continue
   dir_name="$(basename "$dst_dir")"
-  if [[ ! -d "$SOURCE_DIR/agent-persona/tasks/$dir_name" ]]; then
-    if $DRY_RUN; then
-      echo "  [dry-run] would remove: tasks/$dir_name/ (no longer in source)"
-    else
-      rm -rf "$dst_dir"
-      echo "  removed: tasks/$dir_name/ (no longer in source)"
-    fi
-    UPDATED_COUNT=$((UPDATED_COUNT + 1))
+  if [[ ! -d "$SOURCE_AP/tasks/$dir_name" ]]; then
+    remove_path "$dst_dir" "tasks/$dir_name/"
   fi
 done
 
-# Sync any remaining flat task files (backward compat)
-for src_file in "$SOURCE_DIR"/agent-persona/tasks/*.md; do
-  [[ -f "$src_file" ]] || continue
-  base="$(basename "$src_file")"
-  copy_file "$src_file" "$AP_DIR/tasks/$base" "tasks/$base"
-done
-
-# Remove flat task files that no longer exist in source
-for dst_file in "$AP_DIR"/tasks/*.md; do
-  [[ -f "$dst_file" ]] || continue
-  base="$(basename "$dst_file")"
-  if [[ ! -f "$SOURCE_DIR/agent-persona/tasks/$base" ]]; then
-    if $DRY_RUN; then
-      echo "  [dry-run] would remove: tasks/$base (no longer in source)"
-    else
-      rm "$dst_file"
-      echo "  removed: tasks/$base (no longer in source)"
-    fi
-    UPDATED_COUNT=$((UPDATED_COUNT + 1))
-  fi
-done
 echo ""
 
 # ── 2. Scripts ───────────────────────────────────────────────────────────────
-echo "Scripts (agent-persona/scripts/):"
-for src_file in "$SOURCE_DIR"/agent-persona/scripts/*; do
+echo "Scripts (scripts/):"
+
+for src_file in "$SOURCE_AP"/scripts/*; do
   [[ -f "$src_file" ]] || continue
   base="$(basename "$src_file")"
-  copy_file "$src_file" "$AP_DIR/scripts/$base" "scripts/$base"
-  # Preserve executable bit
-  if ! $DRY_RUN && [[ -x "$src_file" ]]; then
-    chmod +x "$AP_DIR/scripts/$base"
+  sync_file "$src_file" "$AP_DIR/scripts/$base" "scripts/$base"
+done
+
+for dst_file in "$AP_DIR"/scripts/*; do
+  [[ -f "$dst_file" ]] || continue
+  base="$(basename "$dst_file")"
+  if [[ ! -f "$SOURCE_AP/scripts/$base" ]]; then
+    remove_path "$dst_file" "scripts/$base"
   fi
 done
+
 echo ""
 
-# ── 3. Personalities (replace defaults, keep user-added) ─────────────────────
-echo "Personalities (agent-persona/personalities/):"
-for src_file in "$SOURCE_DIR"/agent-persona/personalities/*; do
+# ── 3. Docs ──────────────────────────────────────────────────────────────────
+echo "Docs (docs/):"
+
+for src_file in "$SOURCE_AP"/docs/*; do
+  [[ -f "$src_file" ]] || continue
+  base="$(basename "$src_file")"
+  sync_file "$src_file" "$AP_DIR/docs/$base" "docs/$base"
+done
+
+for dst_file in "$AP_DIR"/docs/*; do
+  [[ -f "$dst_file" ]] || continue
+  base="$(basename "$dst_file")"
+  if [[ ! -f "$SOURCE_AP/docs/$base" ]]; then
+    remove_path "$dst_file" "docs/$base"
+  fi
+done
+
+echo ""
+
+# ── 4. Rules ─────────────────────────────────────────────────────────────────
+echo "Rules (rules/):"
+
+for src_file in "$SOURCE_AP"/rules/*; do
+  [[ -f "$src_file" ]] || continue
+  base="$(basename "$src_file")"
+  sync_file "$src_file" "$AP_DIR/rules/$base" "rules/$base"
+done
+
+for dst_file in "$AP_DIR"/rules/*; do
+  [[ -f "$dst_file" ]] || continue
+  base="$(basename "$dst_file")"
+  if [[ ! -f "$SOURCE_AP/rules/$base" ]]; then
+    remove_path "$dst_file" "rules/$base"
+  fi
+done
+
+echo ""
+
+# ── 5. Personalities (sync defaults, keep user-added) ────────────────────────
+echo "Personalities (personalities/):"
+
+for src_file in "$SOURCE_AP"/personalities/*; do
   [[ -f "$src_file" ]] || continue
   base="$(basename "$src_file")"
 
@@ -238,115 +264,74 @@ for src_file in "$SOURCE_DIR"/agent-persona/personalities/*; do
   done
 
   if $is_default; then
-    copy_file "$src_file" "$AP_DIR/personalities/$base" "personalities/$base"
+    sync_file "$src_file" "$AP_DIR/personalities/$base" "personalities/$base"
   else
-    # New personality from source — only add if not present
     if [[ ! -f "$AP_DIR/personalities/$base" ]]; then
-      copy_file "$src_file" "$AP_DIR/personalities/$base" "personalities/$base (new default)"
+      sync_file "$src_file" "$AP_DIR/personalities/$base" "personalities/$base (new default)"
+    else
+      UNCHANGED_COUNT=$((UNCHANGED_COUNT + 1))
     fi
   fi
 done
 
-# Report user-added personalities that are preserved
 for dst_file in "$AP_DIR"/personalities/*; do
   [[ -f "$dst_file" ]] || continue
   base="$(basename "$dst_file")"
-  if [[ ! -f "$SOURCE_DIR/agent-persona/personalities/$base" ]]; then
+  if [[ ! -f "$SOURCE_AP/personalities/$base" ]]; then
     echo "  kept: personalities/$base (user-added)"
   fi
 done
+
 echo ""
 
-# ── 4. Rules ──────────────────────────────────────────────────────────────────
-echo "Rules (agent-persona/rules/):"
-for src_file in "$SOURCE_DIR"/agent-persona/rules/*; do
-  [[ -f "$src_file" ]] || continue
-  base="$(basename "$src_file")"
-  copy_file "$src_file" "$AP_DIR/rules/$base" "rules/$base"
-done
+# ── 6. Data seed template ───────────────────────────────────────────────────
+echo "Data seed template (data-empty/):"
 
-for dst_file in "$AP_DIR"/rules/*; do
-  [[ -f "$dst_file" ]] || continue
-  base="$(basename "$dst_file")"
-  if [[ ! -f "$SOURCE_DIR/agent-persona/rules/$base" ]]; then
-    if $DRY_RUN; then
-      echo "  [dry-run] would remove: rules/$base (no longer in source)"
-    else
-      rm "$dst_file"
-      echo "  removed: rules/$base (no longer in source)"
-    fi
-    UPDATED_COUNT=$((UPDATED_COUNT + 1))
-  fi
-done
-echo ""
-
-# ── 5. Cursor rule (copy into .cursor/rules/) ────────────────────────────────
-echo "Cursor rules:"
-if [[ -f "$SOURCE_DIR/agent-persona/rules/agent-persona.mdc" ]]; then
-  copy_file "$SOURCE_DIR/agent-persona/rules/agent-persona.mdc" \
-            "$TARGET_DIR/.cursor/rules/agent-persona.mdc" \
-            ".cursor/rules/agent-persona.mdc"
-fi
-echo ""
-
-# ── 6. Docs ───────────────────────────────────────────────────────────────────
-echo "Docs (agent-persona/docs/):"
-for src_file in "$SOURCE_DIR"/agent-persona/docs/*; do
-  [[ -f "$src_file" ]] || continue
-  base="$(basename "$src_file")"
-  copy_file "$src_file" "$AP_DIR/docs/$base" "docs/$base"
-done
-
-for dst_file in "$AP_DIR"/docs/*; do
-  [[ -f "$dst_file" ]] || continue
-  base="$(basename "$dst_file")"
-  if [[ ! -f "$SOURCE_DIR/agent-persona/docs/$base" ]]; then
-    if $DRY_RUN; then
-      echo "  [dry-run] would remove: docs/$base (no longer in source)"
-    else
-      rm "$dst_file"
-      echo "  removed: docs/$base (no longer in source)"
-    fi
-    UPDATED_COUNT=$((UPDATED_COUNT + 1))
-  fi
-done
-echo ""
-
-# ── NEVER touch agent-persona/data/ (except personalities above) ─────────────
-echo "Protected (NOT touched):"
-echo "  agent-persona/data/episodic/"
-echo "  agent-persona/data/knowledge/"
-echo "  agent-persona/data/base_persona.json"
-echo "  agent-persona/data/learned_triggers.json"
-echo "  agent-persona/data/current_session_handoff.md"
-echo "  agent-persona/data/conversations/"
-echo "  agent-persona/data/procedural_notes.json"
-echo ""
-
-# ── 7. Write new version ────────────────────────────────────────────────────
-if [[ "$SOURCE_VERSION" != "unknown" ]]; then
-  if $DRY_RUN; then
-    echo "Version: would update .framework-version to $SOURCE_VERSION"
-  else
-    echo "$SOURCE_VERSION" > "$VERSION_FILE"
-    echo "Version: updated .framework-version to $SOURCE_VERSION"
-  fi
-elif [[ -f "$SOURCE_DIR/.framework-version" ]]; then
-  : # Source has version file but it's empty — skip
+if [[ -d "$SOURCE_AP/data-empty" ]]; then
+  $DRY_RUN || mkdir -p "$AP_DIR/data-empty"
+  for src_file in "$SOURCE_AP"/data-empty/*; do
+    [[ -f "$src_file" ]] || continue
+    base="$(basename "$src_file")"
+    sync_file "$src_file" "$AP_DIR/data-empty/$base" "data-empty/$base"
+  done
 else
-  if $DRY_RUN; then
-    echo "Version: no .framework-version in source — would skip"
-  else
-    echo "Version: no .framework-version in source — skipped"
-  fi
+  echo "  (not present in source)"
 fi
+
 echo ""
+
+# ── Protected paths ──────────────────────────────────────────────────────────
+echo "Protected (NOT touched):"
+echo "  data/"
+echo "  config.json"
+echo ""
+
+# ── Re-run init ──────────────────────────────────────────────────────────────
+if ! $DRY_RUN; then
+  echo "Running init.sh to apply any new setup steps..."
+  echo ""
+  bash "$SCRIPT_DIR/init.sh"
+  echo ""
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
+TOTAL_CHANGES=$((ADDED_COUNT + UPDATED_COUNT + REMOVED_COUNT))
+
 echo "============================================================"
 if $DRY_RUN; then
-  echo "  Dry run complete: $UPDATED_COUNT file(s) would change, $SKIPPED_COUNT unchanged"
+  echo "  Dry run complete"
 else
-  echo "  Update complete: $UPDATED_COUNT file(s) updated, $SKIPPED_COUNT unchanged"
+  echo "  Update complete"
+fi
+echo ""
+echo "  Added:     $ADDED_COUNT"
+echo "  Updated:   $UPDATED_COUNT"
+echo "  Removed:   $REMOVED_COUNT"
+echo "  Unchanged: $UNCHANGED_COUNT"
+echo ""
+if [[ $TOTAL_CHANGES -eq 0 ]]; then
+  echo "  Already up to date."
+else
+  echo "  $TOTAL_CHANGES file(s) changed."
 fi
 echo "============================================================"
