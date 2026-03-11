@@ -16,4 +16,4 @@ alwaysApply: true
 - **Debug:** "debug on/off" → `bash agent-persona/tasks/toggle-debug/task.sh on|off`.
 - **Conversations:** "save/load/new/list convo" → `bash agent-persona/tasks/manage-conversation/task.sh --action <action> [--name <name>] [--summary "<summary>"]`.
 - **Footer:** LAST line → `bash agent-persona/tasks/per-turn-check/footer.sh [--epoch E --agents N --calls N]`.
-- **Agent ops:** install.sh / update.sh / export-to-project.sh via Shell.
+- **Agent ops:** `agent-persona/scripts/update.sh` · `agent-persona/scripts/export-to-project.sh` via Shell.
