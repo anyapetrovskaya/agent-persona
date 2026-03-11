@@ -12,8 +12,6 @@ git clone https://github.com/anyapetrovskaya/agent-persona.git agent-persona
 bash agent-persona/scripts/init.sh
 ```
 
-That's it — no standalone or web subsections. Just one install method.
-
 ## First Conversation
 
 Open the project in Cursor and say hi.
