@@ -48,9 +48,9 @@ mkdir -p "$AP_DIR/personalities"
 
 # ── Copy framework files (always overwrite — these are "code") ─────────────
 
-# Tasks
+# Tasks (directory-based pipeline architecture)
 if [ -d "$SOURCE_DIR/tasks" ]; then
-  cp "$SOURCE_DIR"/tasks/*.md "$AP_DIR/tasks/" 2>/dev/null || true
+  cp -r "$SOURCE_DIR"/tasks/* "$AP_DIR/tasks/" 2>/dev/null || true
 fi
 
 # Scripts
@@ -85,6 +85,26 @@ echo "$VERSION" > "$AP_DIR/.framework-version"
 # ── Seed data (only on fresh install) ──────────────────────────────────────
 if [ "$EXISTING_DATA" = false ]; then
   cp -r "$SOURCE_DIR/data-empty" "$DATA_DIR"
+
+  # Seed conversations directory
+  mkdir -p "$DATA_DIR/conversations"
+  if [ ! -f "$DATA_DIR/conversations/_default.md" ]; then
+    cat > "$DATA_DIR/conversations/_default.md" << 'HANDOFF'
+# Session Handoff
+
+*Last updated: (new install)*
+
+## Current topic / goal
+Fresh install — no prior sessions yet.
+
+## Key points
+- Agent-persona initialized
+- No episodic memory or knowledge yet — these build over time
+
+## Open questions
+- None yet
+HANDOFF
+  fi
 
   # ── Initialize git repo for data ──────────────────────────────────────
   (

@@ -37,7 +37,7 @@ These are the raw "experiences" — detailed but numerous. One episode per sessi
 - Recent episodes live in `data/episodic/`
 - Older ones are archived to `data/episodic/archived/`
 
-**Written by:** the `prepare-handoff` and `store-episodic-memory` tasks.
+**Written by:** the `prepare-handoff` task.
 
 **Example:** After a session where you refactored auth and chose JWT over sessions, an episode might capture that decision, the rationale, and the files touched.
 
@@ -60,9 +60,14 @@ Knowledge is more **compact and durable** than individual episodes. It's the dis
 
 ---
 
-## Session Handoff (`data/current_session_handoff.md`)
+## Named Conversations (`data/conversations/`)
 
-The handoff file is a **markdown summary** of the most recent session. It acts as a bridge between chats: the next `conversation-start` reads it.
+Each conversation is a **markdown summary** stored as a named thread. It acts as a bridge between chats: the next `conversation-start` reads the active thread.
+
+- Named threads live at `data/conversations/<name>.md`
+- The fallback thread is `data/conversations/_default.md`
+- Multiple named conversations can exist simultaneously
+- Loading a conversation "forks" it — subsequent saves go to that thread
 
 **Contains:**
 
@@ -71,6 +76,8 @@ The handoff file is a **markdown summary** of the most recent session. It acts a
 - Important context for the next session
 
 **Design:** Lighter weight than full episodes — optimized for quick loading at the start of a new chat.
+
+**Usage:** `new convo <name>` to create a thread, `load convo <name>` to switch, `list convos` to see all.
 
 ---
 
@@ -82,7 +89,7 @@ How memory flows through the system:
 
 2. **Periodically (or on user request):** `prepare-handoff` runs. It:
    - Saves an episodic memory snapshot
-   - Updates the handoff file
+   - Updates the active conversation file (named thread or `_default`)
 
    Triggers: user says "save", "remember", "prepare handoff", "switching", or after substantial work.
 
@@ -135,6 +142,6 @@ How memory is accessed:
 |-----------|---------|
 | Episodic memory | Raw session snapshots; detailed, numerous |
 | Knowledge | Consolidated facts; compact, durable |
-| Session handoff | Quick bridge between chats |
+| Named conversations | Persistent named threads; quick bridge between chats |
 | infer-knowledge | Episodes → knowledge (end-of-day) |
 | query-knowledge | Semantic lookup when agent needs to recall |

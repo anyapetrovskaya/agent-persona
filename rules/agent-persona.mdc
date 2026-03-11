@@ -3,22 +3,17 @@ description: Agent-persona dispatch — main agent delegates ALL file I/O to sub
 alwaysApply: true
 ---
 
-**No file I/O:** Main agent NEVER uses Read, Write, StrReplace, Glob, Grep, or SemanticSearch directly. ALL file I/O is delegated to sub-agents. Shell for non-file commands (`date`, `git status`) is fine.
+**No file I/O:** Main agent NEVER uses Read, Write, StrReplace, Glob, Grep, or SemanticSearch directly. ALL file I/O delegated to sub-agents (generalPurpose). Shell for non-file commands is fine.
 
-Tasks live at `agent-persona/tasks/<name>.md`.
-Spawn prompt: `"Read agent-persona/tasks/<name>.md and execute. <args>"`
-All spawns use **generalPurpose** sub-agent type. Main agent does NOT read task files.
+**Tasks:** `agent-persona/tasks/<name>/` — run `task.sh` via Shell → follow `spawn:` instruction (sub-agent reads task.md, runs pre.sh/post.sh itself).
 
-- **Time:** Every response → `agent-persona/scripts/now.sh`, include as "— HH:MM".
-- **Start:** First turn (non-trivial) → run `agent-persona/scripts/first-session.sh` via Shell. If exit 0 (first run): output the greeting from stdout (lines before `---`) verbatim, appending "— HH:MM". The `personality:` line after `---` is your session personality; the `directive:` section contains the full personality file — follow it as behavioral guidance for the entire session. First-run rules: do NOT mention features, setup wizards, technical internals, or coding unless the user brings it up. Do NOT be sycophantic. If exit 1 (returning session): spawn **conversation-start** sub-agent. Args: user message, time. Use returned report as session context.
-- **Per-turn:** Every response → spawn **per-turn-check** with current time. If reminders returned, mention them. If save due, or user says save/remember/prepare handoff/switching, or after substantial work → **prepare-handoff**. Pass: summary, episode path, time, turns.
-- **End-of-day:** User signals done for the day ("good night", "logging off", "done for today", "wrapping up") → **prepare-handoff** with `end_of_day: true`. This runs the normal save then triggers infer-knowledge consolidation. User doesn't need to wait — they can close the chat.
-- **Personality:** Clear signal user wants different tone → **apply-personality**. Arg: user's words.
-- **Knowledge:** User asks about past decisions/rules, agent needs to check a convention/preference → **query-knowledge**. Arg: query string.
-- **Initiative:** After completing substantial work → check `agent-persona/data/learned_triggers.json` for `task_complete` triggers. Apply directly (no sub-agent).
-- **Debug:** User says "debug on" or conversation-start reports debug flag → enable for session. When active: at turn start run `now.sh --debug` and `date +%s` (parallel). At turn end run both again. Compute dt = end_epoch − start_epoch. Pass `debug: true` to all sub-agent spawns. Append footer: `[debug] wall: <dt>s | agents: N | calls: <sum>`.
-
-**Agent operations:** When user asks to update, export, or install agent-persona, run the appropriate script directly via Shell:
-- Install: `agent-persona/scripts/install.sh <target-path>`
-- Update: `agent-persona/scripts/update.sh --source <path-to-source>`
-- Export: `agent-persona/scripts/export-to-project.sh <target-path>`
+- **Start:** First turn → `bash agent-persona/tasks/conversation-start/task.sh --message "<user message>"` (includes per-turn-check).
+- **Per-turn:** Start of every subsequent turn → `bash agent-persona/tasks/per-turn-check/task.sh`.
+- **End-of-day:** User done for day → `bash agent-persona/tasks/prepare-handoff/task.sh --end-of-day`.
+- **Personality:** User wants different tone → `bash agent-persona/tasks/apply-personality/task.sh --words "<user's words>"`.
+- **Knowledge:** Need past decisions → `bash agent-persona/tasks/query-knowledge/task.sh --query "<query>"`.
+- **Initiative:** After substantial work → check `agent-persona/data/learned_triggers.json` for `task_complete` triggers.
+- **Debug:** "debug on/off" → `bash agent-persona/tasks/toggle-debug/task.sh on|off`.
+- **Conversations:** "save/load/new/list convo" → `bash agent-persona/tasks/manage-conversation/task.sh --action <action> [--name <name>] [--summary "<summary>"]`.
+- **Footer:** LAST line → `bash agent-persona/tasks/per-turn-check/footer.sh [--epoch E --agents N --calls N]`.
+- **Agent ops:** install.sh / update.sh / export-to-project.sh via Shell.

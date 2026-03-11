@@ -10,7 +10,14 @@ The system is driven by a single Cursor rule file: `rules/agent-persona.mdc`. Th
 
 The main agent acts as an **orchestrator**. It never reads or writes files directly. Instead, it spawns **sub-agents** (using Cursor's Task tool with `generalPurpose` type) that perform all file I/O. This is a hard constraint enforced by the rule — the main agent delegates all disk operations to sub-agents.
 
-**Spawn format:** `"Read agent-persona/tasks/<name>.md and execute. <args>"`
+**How a task is invoked:**
+
+1. Main agent runs `task.sh` via Shell (e.g., `bash agent-persona/tasks/conversation-start/task.sh --session abc123`)
+2. `task.sh` stages arguments, performs any setup, and prints a `spawn:` instruction to stdout
+3. Main agent follows the spawn instruction — creates a sub-agent with the specified prompt
+4. Sub-agent reads `task.md`, runs `pre.sh` (if present), executes the task, then runs `post.sh` (if present)
+
+The main agent does **not** directly say "Read tasks/X.md" — it always runs `task.sh` first and follows the returned spawn instruction.
 
 ---
 
@@ -20,7 +27,7 @@ Several design reasons drive this architecture:
 
 - **Context isolation** — Each sub-agent receives only the context it needs for its task. A task that writes episodic memory doesn't need the full conversation history; it gets the episode data and writes it. This keeps each operation focused.
 
-- **Modularity** — Capabilities are defined in task files under `tasks/`. Adding a new capability means adding a new task file and a rule to invoke it. No changes to the orchestrator's core logic.
+- **Modularity** — Capabilities are defined as task directories under `tasks/`. Adding a new capability means adding a new directory with `task.sh`, `task.md`, and optional scripts. No changes to the orchestrator's core logic.
 
 - **Main agent focus** — The main agent's context stays centered on the conversation. It doesn't accumulate file contents, schemas, or implementation details. It decides *when* to call tasks and *what* to pass; the tasks handle the details.
 
@@ -30,31 +37,36 @@ Several design reasons drive this architecture:
 
 ## 3. Task System
 
-Each capability is defined as a markdown task file in `tasks/`. When the main agent needs to perform an operation, it spawns a sub-agent with:
+Each capability is a **task directory** under `tasks/` with a pipeline architecture:
 
-> Read agent-persona/tasks/[name].md and execute. [args]
+### Pipeline components
 
-The task file contains all instructions for that operation. Key tasks:
+| Component | Role |
+|-----------|------|
+| `task.sh` | Entry point. Main agent runs this via Shell. Accepts args (e.g., `--conversation mythread`, `--session abc123`), stages them as JSON in `.staging/`, and outputs a `spawn:` instruction to stdout. |
+| `task.md` | Instructions for the sub-agent. Describes what to do, what files to read/write, and how to format output. |
+| `pre.sh` | (optional) Run by the sub-agent before main work. Gathers context, reads staged args from `.staging/`, assembles data the sub-agent needs. |
+| `post.sh` | (optional) Run by the sub-agent after main work. Writes results to disk — episodes, handoff files, knowledge updates, etc. |
+
+### Current tasks
 
 | Task | Purpose |
 |------|---------|
-| **conversation-start** | Loads prior context, personality, and reminders when a new chat begins |
-| **per-turn-check** | Runs each turn; checks save timing and reminders |
-| **prepare-handoff** | Saves episodic memory and session context for the next session |
-| **store-episodic-memory** | Writes a session snapshot to JSON |
-| **infer-knowledge** | Consolidates episodes into durable knowledge (patterns, preferences, facts) |
-| **query-knowledge** | Retrieves relevant knowledge for a user question |
+| **conversation-start** | Loads prior context, personality, named conversation at session start |
+| **per-turn-check** | Per-turn timing, save checks, reminders; includes `footer.sh` for completion chime |
+| **prepare-handoff** | Saves episodic memory and session handoff (supports named conversations) |
+| **manage-conversation** | Named conversation management: save, load, new, list |
+| **query-knowledge** | On-demand knowledge retrieval |
 | **apply-personality** | Adjusts personality based on user feedback |
-| **infer-base-persona** | Derives trait values from interaction history |
 | **reflect** | Self-evaluation and improvement suggestions |
-| **suggest-learned-behavior** | Proposes new procedural notes from patterns |
-| **build-memory-graph** | Creates graph representation of knowledge |
-| **check-reminders** | Scans for upcoming reminders |
-| **eval-baseline** / **eval-report** | Evaluation and benchmarking |
-| **proactive-initiative** | Suggests actions based on learned triggers |
-| **generate-narrative** | Creates human-readable memory summaries |
+| **infer-knowledge** | End-of-day consolidation: episodes → durable knowledge |
+| **infer-base-persona** | Derives base persona trait values from interaction history |
+| **suggest-learned-behavior** | Proposes procedural notes from observed patterns |
+| **build-memory-graph** | Generates knowledge graph visualization |
+| **proactive-initiative** | Context-aware suggestions based on learned triggers |
+| **generate-narrative** | Creates human-readable relationship/memory narratives |
 | **memory-diff** | Shows what changed between saves |
-| **session-handoff** | Transfers context between sessions |
+| **toggle-debug** | Enables/disables debug output |
 
 ---
 
@@ -64,17 +76,22 @@ The task file contains all instructions for that operation. Key tasks:
 Chat opens
     │
     ▼
-conversation-start  ← Load prior context, personality, reminders
+conversation-start  ← Load prior context, personality, named conversation
+    │                  (includes per-turn-check internally)
     │
     ▼
 ┌─────────────────────────────────────────┐
 │  [User turns + per-turn-check]          │
 │  • Per-turn-check runs every response   │
-│  • Triggers: reminders, save timing     │
+│  • Triggers: save timing, reminders     │
+│  • footer.sh runs at end of each turn   │
 └─────────────────────────────────────────┘
     │
     ▼
 prepare-handoff  ← On save due, user says "save", or end-of-day
+    │               (saves to named conversation if one is active)
+    ▼
+[end-of-day only: infer-knowledge consolidation]
     │
     ▼
 Chat closes
@@ -82,9 +99,10 @@ Chat closes
 
 **Triggers:**
 
-- **conversation-start** — First non-trivial turn in a new chat
-- **per-turn-check** — Every response; uses current time
-- **prepare-handoff** — When save is due, user says "save"/"remember"/"prepare handoff", after substantial work, or at end-of-day (which also triggers infer-knowledge consolidation)
+- **conversation-start** — First non-trivial turn in a new chat. Can load a specific named conversation or fall back to `_default.md`.
+- **per-turn-check** — Every response; uses current time. Included in conversation-start's first run.
+- **prepare-handoff** — When save is due, user says "save"/"remember"/"prepare handoff", after substantial work, or at end-of-day (which also triggers infer-knowledge consolidation).
+- **manage-conversation** — User says "save convo", "load convo", "new convo", or "list convos".
 
 ---
 
@@ -100,8 +118,10 @@ Data moves through the system as follows:
 
 4. **Visualization** — Knowledge can be rendered as a graph at `data/knowledge/memory_graph.html` (and related 3D/timeline views) for inspection.
 
-5. **Handoff file** — `data/current_session_handoff.md` bridges sessions. It summarizes the last session so `conversation-start` can load it when a new chat opens.
+5. **Handoff files** — Named conversation threads live in `data/conversations/`. The active thread (e.g., `data/conversations/myproject.md` or `data/conversations/_default.md`) bridges sessions — `conversation-start` loads the relevant thread when a new chat opens.
+
+6. **Session-scoped staging** — Each chat session gets a unique ID. Task arguments, intermediate results, and temporary files are namespaced under `data/.staging/<session-id>/` to prevent conflicts when multiple chats share a workspace.
 
 ---
 
-*Technical but approachable. For implementation details, see the task files in `tasks/`.*
+*Technical but approachable. For implementation details, see the task directories in `tasks/`.*

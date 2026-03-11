@@ -159,13 +159,45 @@ copy_file() {
 
 # ── 1. Tasks ─────────────────────────────────────────────────────────────────
 echo "Tasks (agent-persona/tasks/):"
+
+# Sync task directories (pipeline architecture)
+for src_dir in "$SOURCE_DIR"/agent-persona/tasks/*/; do
+  [[ -d "$src_dir" ]] || continue
+  dir_name="$(basename "$src_dir")"
+  mkdir -p "$AP_DIR/tasks/$dir_name"
+  for src_file in "$src_dir"*; do
+    [[ -f "$src_file" ]] || continue
+    base="$(basename "$src_file")"
+    copy_file "$src_file" "$AP_DIR/tasks/$dir_name/$base" "tasks/$dir_name/$base"
+    if ! $DRY_RUN && [[ -x "$src_file" ]]; then
+      chmod +x "$AP_DIR/tasks/$dir_name/$base"
+    fi
+  done
+done
+
+# Remove task directories that no longer exist in source
+for dst_dir in "$AP_DIR"/tasks/*/; do
+  [[ -d "$dst_dir" ]] || continue
+  dir_name="$(basename "$dst_dir")"
+  if [[ ! -d "$SOURCE_DIR/agent-persona/tasks/$dir_name" ]]; then
+    if $DRY_RUN; then
+      echo "  [dry-run] would remove: tasks/$dir_name/ (no longer in source)"
+    else
+      rm -rf "$dst_dir"
+      echo "  removed: tasks/$dir_name/ (no longer in source)"
+    fi
+    UPDATED_COUNT=$((UPDATED_COUNT + 1))
+  fi
+done
+
+# Sync any remaining flat task files (backward compat)
 for src_file in "$SOURCE_DIR"/agent-persona/tasks/*.md; do
   [[ -f "$src_file" ]] || continue
   base="$(basename "$src_file")"
   copy_file "$src_file" "$AP_DIR/tasks/$base" "tasks/$base"
 done
 
-# Remove task files that no longer exist in source
+# Remove flat task files that no longer exist in source
 for dst_file in "$AP_DIR"/tasks/*.md; do
   [[ -f "$dst_file" ]] || continue
   base="$(basename "$dst_file")"
@@ -287,6 +319,7 @@ echo "  agent-persona/data/knowledge/"
 echo "  agent-persona/data/base_persona.json"
 echo "  agent-persona/data/learned_triggers.json"
 echo "  agent-persona/data/current_session_handoff.md"
+echo "  agent-persona/data/conversations/"
 echo "  agent-persona/data/procedural_notes.json"
 echo ""
 

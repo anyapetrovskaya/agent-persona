@@ -63,6 +63,29 @@ if [ "$SEEDED" = true ]; then
   touch "$AP_DIR/data/.first_run"
 fi
 
+# ── Ensure conversations directory ───────────────────────────────────────────
+
+CONV_DIR="$AP_DIR/data/conversations"
+if [ ! -d "$CONV_DIR" ]; then
+  mkdir -p "$CONV_DIR"
+  cat > "$CONV_DIR/_default.md" << 'HANDOFF'
+# Session Handoff
+
+*Last updated: (new install)*
+
+## Current topic / goal
+Fresh install — no prior sessions yet.
+
+## Key points
+- Agent-persona initialized
+- No episodic memory or knowledge yet — these build over time
+
+## Open questions
+- None yet
+HANDOFF
+  echo "conversations/ seeded with _default.md. OK"
+fi
+
 # ── Detect timezone ──────────────────────────────────────────────────────────
 
 DETECTED_TZ="UTC"

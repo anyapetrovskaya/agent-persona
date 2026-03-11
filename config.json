@@ -1,4 +1,5 @@
 {
   "git_sync": false,
+  "debug": true,
   "timezone": "America/Los_Angeles"
 }

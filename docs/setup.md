@@ -47,9 +47,10 @@ After installation, your target project will contain:
 | Path | Contents |
 |------|----------|
 | `agent-persona/` | Framework and your data |
-| `agent-persona/tasks/` | Task definitions the agent runs (conversation-start, per-turn-check, etc.) |
+| `agent-persona/tasks/` | Task directories with pipeline scripts (task.sh, task.md, pre.sh, post.sh) |
 | `agent-persona/scripts/` | Install, update, export, and visualization scripts |
 | `agent-persona/data/` | Episodic memory, knowledge graph, persona, triggers |
+| `agent-persona/data/conversations/` | Named conversation threads |
 | `agent-persona/docs/` | Documentation |
 | `agent-persona/personalities/` | Personality presets |
 | `agent-persona/rules/` | Canonical rule files |
@@ -76,8 +77,8 @@ agent-persona/scripts/update.sh --source <path-to-agent-persona-repo>
 
 The update script:
 
-- Updates tasks, scripts, rules, docs, and default personalities
-- **Does not modify** your episodic memory, knowledge, base persona, triggers, or session handoff
+- Updates task directories (including pipeline scripts), scripts, rules, docs, and default personalities
+- **Does not modify** your episodic memory, knowledge, base persona, triggers, or conversation threads
 - Can remove files that no longer exist in the source
 - Supports `--dry-run` to preview changes without applying them
 
@@ -115,7 +116,7 @@ After installation:
 
 2. **Default personality** — The agent starts with a "supportive" persona. Traits (warmth, verbosity, etc.) are set to defaults and will adjust as you interact.
 
-3. **No prior memory** — Episodic memory and knowledge are empty. They build up over sessions as you work and the agent runs its tasks.
+3. **No prior memory** — Episodic memory and knowledge are empty. They build up over sessions as you work and the agent runs its tasks. The agent starts with a `_default` conversation thread. You can create named threads later with `new convo <name>`.
 
 4. **Knowledge consolidation** — After a few sessions (especially when you say things like "good night" or "done for today"), the agent runs knowledge inference and starts consolidating what it learned into the knowledge graph.
 

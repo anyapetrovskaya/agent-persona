@@ -73,13 +73,13 @@ You are the infer-knowledge sub-agent.
    Examples: trait "works in short 1-2h sessions" + episodic "logged 5-8h session" → contested. Preference "prefers tabs" + episodic "switched project to spaces" → contested.
 7. **Prune:** Merge near-duplicates, drop superseded. Do not skip.
 8. **Write:** Save `agent-persona/data/knowledge/knowledge.json` (UTF-8). Set `last_infer_date` to today. Preserve existing items that were not updated.
-9. **Build memory graph.** Read `agent-persona/tasks/build-memory-graph.md` and execute. Pass: knowledge path (`agent-persona/data/knowledge/knowledge.json`), episodic path (`agent-persona/data/episodic/`), graph path (`agent-persona/data/knowledge/memory_graph.json`). This extracts entities and relationships into a graph and generates an HTML visualization.
+9. **Build memory graph.** Read `agent-persona/tasks/build-memory-graph/task.md` and execute. Pass: knowledge path (`agent-persona/data/knowledge/knowledge.json`), episodic path (`agent-persona/data/episodic/`), graph path (`agent-persona/data/knowledge/memory_graph.json`). This extracts entities and relationships into a graph and generates an HTML visualization.
 10. **Rebuild timeline.** Run `python agent-persona/scripts/visualize-timeline.py` to regenerate `agent-persona/data/knowledge/memory_timeline.html` from all current data sources. If the script fails, note the error but continue.
 11. **Archive old episodes:** Use `archive_cutoff`. For each `agent-persona/data/episodic/episode_*.json`, parse the date portion (`YYYY-MM-DD`) from the filename. If the episode date is **strictly before** `archive_cutoff`, move it to `agent-persona/data/episodic/archived/`. Episodes from the same day or newer stay. Do not move `.gitkeep`.
-12. **Infer base persona:** Read `agent-persona/tasks/infer-base-persona.md` and execute on the knowledge just written.
-13. **Suggest behavior:** Read `agent-persona/tasks/suggest-learned-behavior.md` and execute. If a candidate trigger is returned, include it in your report.
-14. **Proactive initiative:** Read `agent-persona/tasks/proactive-initiative.md` and execute with trigger=`after_infer_knowledge`, context=summary from above. If a line is returned, include it.
-15. **Reflect:** Read `agent-persona/tasks/reflect.md` and execute. Pass: episodes processed in step 1, knowledge counts from this run (+added, ~updated, -pruned), eval log path (`agent-persona/data/eval/eval_log.json`). Include reflection summary in report.
+12. **Infer base persona:** Read `agent-persona/tasks/infer-base-persona/task.md` and execute on the knowledge just written.
+13. **Suggest behavior:** Read `agent-persona/tasks/suggest-learned-behavior/task.md` and execute. If a candidate trigger is returned, include it in your report.
+14. **Proactive initiative:** Read `agent-persona/tasks/proactive-initiative/task.md` and execute with trigger=`after_infer_knowledge`, context=summary from above. If a line is returned, include it.
+15. **Reflect:** Read `agent-persona/tasks/reflect/task.md` and execute. Pass: episodes processed in step 1, knowledge counts from this run (+added, ~updated, -pruned), eval log path (`agent-persona/data/eval/eval_log.json`). Include reflection summary in report.
 
 ## Report format
 
