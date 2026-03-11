@@ -1,40 +1,18 @@
 # Agent Persona
 
-*Think of Agent Persona as a collaborator who gets better at working with you over time. Not a tool you configure — a relationship you build.*
+*Think of Agent Persona as a partner who gets better at working with you over time. Not a tool you configure — a relationship you build.*
 
 ## Getting Started
 
-### Standalone setup
-
-Use the repo itself as your workspace:
+### Install into a project
 
 ```bash
-git clone https://github.com/anyapetrovskaya/agent-persona.git
-cd agent-persona
-bash scripts/init.sh
+cd /path/to/your-project
+git clone https://github.com/anyapetrovskaya/agent-persona.git agent-persona
+bash agent-persona/scripts/init.sh
 ```
 
-
-
-### Cursor Web setup
-
-For a cloud-based setup with persistent memory across sessions:
-
-```bash
-git clone https://github.com/anyapetrovskaya/agent-persona.git my-agent-persona
-cd my-agent-persona
-bash scripts/init.sh --web
-```
-
-Push to a private repo, then open it in Cursor Web.
-
-### Install into an existing project
-
-Export Agent Persona into another project:
-
-```bash
-./scripts/export-to-project.sh /path/to/your-project
-```
+That's it — no standalone or web subsections. Just one install method.
 
 ## First Conversation
 
@@ -57,20 +35,20 @@ Agent Persona works best with **high-capability models** (e.g. Claude Opus 4.6).
 
 ## Managing Your Data
 
-All data lives in `data/` — memory, knowledge, personality, preferences. You own it.
+All data lives in `agent-persona/data/` — memory, knowledge, personality, preferences. You own it.
 
 ### Export to another project
 
 ```bash
-./scripts/export-to-project.sh /path/to/other-project
+bash agent-persona/scripts/export-to-project.sh /path/to/other-project
 ```
 
 ### Update the framework
 
-Get the latest improvements without touching your data:
+Get the latest improvements without touching your data. The script downloads the latest release, syncs framework files, and re-runs init.
 
 ```bash
-./scripts/update.sh --source /path/to/agent-persona-release
+bash agent-persona/scripts/update.sh
 ```
 
 Or just ask your agent: "Could you update agent-persona for me?"
