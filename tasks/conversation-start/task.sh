@@ -8,6 +8,9 @@ DATA="$BASE/data"
 CONFIG="$BASE/config.json"
 STAGING="$DATA/.staging"
 
+PLATFORM="ide"
+[[ -f "$CONFIG" ]] && PLATFORM=$(jq -r '.platform // "ide"' "$CONFIG" 2>/dev/null || echo ide)
+
 # --- Parse args ---
 TIME="" MESSAGE="" CONVERSATION="" SESSION=""
 while [[ $# -gt 0 ]]; do
@@ -41,15 +44,19 @@ if [[ -f "$DATA/.first_run" ]]; then
   fi
 
   # --- Silent housekeeping (no stdout) before greeting ---
-  rm -f "$DATA/.first_run"
-  [[ ! -f "$DATA/backlog.json" ]] && echo '{"items":[]}' > "$DATA/backlog.json"
-  mkdir -p "$DATA/eval"
-  [[ ! -f "$DATA/eval/eval_log.json" ]] && echo '{"records":[]}' > "$DATA/eval/eval_log.json"
+  # On web platform, defer ALL file modifications to turn 1 to avoid
+  # triggering Cursor's auto-initiated second turn from visible changes.
+  if [[ "$PLATFORM" != "web" ]]; then
+    rm -f "$DATA/.first_run"
+    [[ ! -f "$DATA/backlog.json" ]] && echo '{"items":[]}' > "$DATA/backlog.json"
+    mkdir -p "$DATA/eval"
+    [[ ! -f "$DATA/eval/eval_log.json" ]] && echo '{"records":[]}' > "$DATA/eval/eval_log.json"
 
-  if command -v git &>/dev/null && [[ -d "$BASE/../../.git" ]]; then
-    GIT_SYNC=$(jq -r '.git_sync // false' "$CONFIG" 2>/dev/null)
-    if [[ "$GIT_SYNC" == "true" ]]; then
-      (cd "$BASE/../.." && git add -A && git commit -m "First-run initialization" && git push) &>/dev/null || true
+    if command -v git &>/dev/null && [[ -d "$BASE/../../.git" ]]; then
+      GIT_SYNC=$(jq -r '.git_sync // false' "$CONFIG" 2>/dev/null)
+      if [[ "$GIT_SYNC" == "true" ]]; then
+        (cd "$BASE/../.." && git add -A && git commit -m "First-run initialization" && git push) &>/dev/null || true
+      fi
     fi
   fi
 
@@ -67,7 +74,9 @@ if [[ -f "$DATA/.first_run" ]]; then
     echo "$DIRECTIVE"
   fi
   echo "---"
+  HHMM=$(date +%H:%M)
   echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT run the footer. Do NOT make any git commits, file changes, or additional tool calls. Your ONLY action is to output the greeting."
+  [[ "$PLATFORM" == "web" ]] && echo "Your LAST line of response must be: — $HHMM —"
   exit 0
 fi
 

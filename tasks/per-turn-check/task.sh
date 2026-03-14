@@ -103,6 +103,24 @@ if [[ "$TURN" == "0" ]]; then
   exit 0
 fi
 
+# --- Web deferred first-run housekeeping ---
+# On web, turn 0 skips file ops to avoid triggering auto-second-turn.
+# If .first_run still exists at turn 1+, run the deferred cleanup now.
+if [[ "$PLATFORM" == "web" && -f "$BASE/.first_run" ]]; then
+  AP_ROOT="$SCRIPT_DIR/../.."
+  rm -f "$BASE/.first_run"
+  [[ ! -f "$BASE/backlog.json" ]] && echo '{"items":[]}' > "$BASE/backlog.json"
+  mkdir -p "$BASE/eval"
+  [[ ! -f "$BASE/eval/eval_log.json" ]] && echo '{"records":[]}' > "$BASE/eval/eval_log.json"
+
+  if command -v git &>/dev/null && [[ -d "$AP_ROOT/../../.git" ]]; then
+    GIT_SYNC=$(jq -r '.git_sync // false' "$CONFIG" 2>/dev/null)
+    if [[ "$GIT_SYNC" == "true" ]]; then
+      (cd "$AP_ROOT/../.." && git add -A && git commit -m "First-run initialization" && git push) &>/dev/null || true
+    fi
+  fi
+fi
+
 # --- Turn 1+: normal per-turn-check ---
 has_actions=false
 action_lines=""

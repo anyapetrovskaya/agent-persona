@@ -99,7 +99,7 @@ fi
 # ── 7. Graph validation ──────────────────────────────────────────────────────
 GRAPH_WARN=""
 if [[ -f "$GRAPH" ]]; then
-  ALLOWED_TYPES='["part_of","created","supports","motivated_by","replaced","contradicts","parent_of","sibling_of","married_to","daughter_of","uses","writes_to","reads_from","embodies","explores","portrait_of","relates_to"]'
+  ALLOWED_TYPES='["part_of","uses","reads_from","writes_to","replaced","created","motivated_by","supports","contradicts","parent_of","child_of","sibling_of","married_to","belongs_to","embodies","explores","works_at","relates_to"]'
 
   # 7a. Valid node references — every edge source/target must exist as a node ID
   DANGLING=$(jq --raw-output '

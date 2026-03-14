@@ -21,6 +21,13 @@ From episode records, create candidate knowledge items:
 
 Do not promote episode-specific events. Set `source_type`: `self_reported` / `observed` / `inferred`. Set `created` to today's date. Post.sh enforces `scope: "user"` for traits automatically.
 
+### Extraction priorities
+
+- **Named entities:** Use real names from episodes, never genericize (e.g., "Peter Varvak" not "anya-husband", "Vladimir I. Petrovsky" not "anya-father"). Extract all named people, pets, and organizations as `fact` items with their real names.
+- **Design principles/theses:** If the user articulates a principle, thesis, or approach by name (e.g., "feelings-as-floats", "toast approach", "personhood"), extract it as a knowledge item AND ensure it becomes a concept node in Step 6.
+- **Operational rules:** If an episode explicitly states a rule or convention (e.g., "at conversation start, if last_infer_date is missing or older than today, run infer-knowledge", "proactive save every 15 min"), extract it as a `rule`-type knowledge item with exact wording.
+- **System components:** Any component, script, or task mentioned in 3+ episodes should be extracted as a `fact` or `convention` and get a graph node in Step 6.
+
 ## Step 2: Merge
 
 Semantic dedup only — exact-match dedup is already handled by pre.sh. Compare candidates against existing items by meaning/intent. Match → increment `strength`, append `source`. Cap `strength` at 5 (never exceed). Contradictions → prefer explicit user > more recent > higher `source_type` weight (`observed` > `self_reported` > `inferred`).
@@ -75,20 +82,41 @@ If it matches, reuse the existing node ID. If it's a new entity, create a new no
 }
 ```
 
-### Edge type taxonomy (closed set)
+### Edge type taxonomy (closed set — 18 types)
 
-- `part_of` — component/subsystem hierarchy
-- `created` — authorship/origin
-- `supports` — enables/implements
-- `motivated_by` — design rationale
-- `replaced` — evolution/history
-- `contradicts` — tension/conflict
-- `parent_of`, `sibling_of`, `married_to`, `daughter_of` — family relationships
-- `uses` — operational dependency
-- `writes_to`, `reads_from` — data flow
-- `embodies` — identity/representation
-- `explores` — investigation/discussion
-- `relates_to` — ONLY as last resort, must include a specific `fact`
+**System:** `part_of`, `uses`, `reads_from`, `writes_to`, `replaced`
+**Causation:** `created`, `motivated_by`, `supports`, `contradicts`
+**People:** `parent_of`, `child_of`, `sibling_of`, `married_to`, `belongs_to`
+**Identity:** `embodies`, `explores`
+**Biographical:** `works_at`
+**Catch-all:** `relates_to` — ONLY as last resort. Must include a specific `fact` describing the relationship. These facts enable future reclassification when new edge types are added.
+
+Rules:
+- Symmetric edges (`sibling_of`, `married_to`) must be stored in BOTH directions.
+- Use `child_of` (not `daughter_of`/`son_of`) for child→parent edges.
+- Use `belongs_to` for pets, possessions, or membership in a person's household.
+- Do NOT use `part_of` for living beings.
+
+### Relationship inference rules
+
+Generate inferred edges automatically based on these rules (unless explicitly contradicted in the data, e.g., half-siblings, step-parents):
+
+**People:**
+- **Siblings share parents:** If A `sibling_of` B and A `child_of` C, then B `child_of` C and C `parent_of` B.
+- **Spouses share parenthood:** If A `married_to` B and A `parent_of` C, then B `parent_of` C and C `child_of` B.
+- **Inverse pairing:** Every `parent_of` edge implies a `child_of` edge in the reverse direction, and vice versa. Always create both.
+- **Same-parent siblings:** If A `parent_of` B and A `parent_of` C (B ≠ C), then B `sibling_of` C (both directions).
+- **Symmetric edges:** `sibling_of` and `married_to` are always stored in both directions.
+
+**Systems:**
+- Do NOT create transitive edges (e.g., if A `part_of` B and B `part_of` C, do not add A `part_of` C). Transitive relationships are discovered via graph traversal, not edge creation.
+
+### Graph extraction priorities
+
+- **People nodes:** Use real names. If an episode says "Vladimir I. Petrovsky", the node id should be `vladimir-petrovsky`, not `anya-father`. Include full names in `name` and role-based aliases (e.g., `aliases: ["anya's father"]`).
+- **Concept nodes:** Create nodes (type `concept`) for intellectual theses, design principles, and philosophical threads discussed across episodes — not just system components. Examples: "feelings-as-floats", "toast approach", "personhood", "three-tier memory".
+- **Inter-component edges:** Don't just connect everything to the project hub with `part_of`. Create edges BETWEEN components that interact: data flow (`writes_to`, `reads_from`), dependency (`uses`), hierarchy (`part_of` subsystem, not just `part_of` project), and rationale (`motivated_by`). For example: three-tier-memory → episodic-memory (`part_of`), suggest-learned-behavior → learned-triggers (`reads_from`), prepare-handoff → named-conversations (`uses`).
+- **Motivation chains:** When episodes explain WHY something was designed a certain way, create `motivated_by` edges linking the component to the concept or decision that drove it. These are among the most valuable edges in the graph.
 
 ### Instructions
 
