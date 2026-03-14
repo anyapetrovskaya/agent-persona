@@ -40,6 +40,9 @@ else
   printf '— %s\n' "$HHMM"
 fi
 
+printf '\n=== INSTRUCTIONS ===\n'
+printf 'Print the footer line above as your final response text.\n'
+
 if (( dt > 0 )); then
   bash "$BASE/scripts/eval-append.sh" --type turn_metric \
     --wall_seconds "$dt" --agents "$agents" --calls "$calls" &>/dev/null &

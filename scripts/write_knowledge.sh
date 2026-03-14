@@ -118,13 +118,9 @@ validate_item() {
   return 0
 }
 
-# --- add ---
-cmd_add() {
-  local type="" content="" scope="project" source="" source_type="self_reported"
-  local polarity="" pinned="false" emotional_value=""
-
-  if [[ $# -eq 0 ]]; then
-    cat <<EOF
+# --- help functions (non-recursive) ---
+show_add_help() {
+  cat <<EOF
 Usage: $(basename "$0") add --type TYPE --content "CONTENT" [options]
 
 Required:
@@ -139,6 +135,34 @@ Optional:
   --pinned              Mark as pinned (immune to decay)
   --emotional-value N   Numeric emotional value
 EOF
+}
+
+show_seed_help() {
+  cat <<EOF
+Usage: $(basename "$0") seed --file PATH
+
+Bulk-add knowledge items from a JSON array file.
+Each object must have at least "type" and "content".
+Optional fields: scope, source, source_type, polarity, pinned, emotional_value.
+Items that fail validation are skipped with a warning.
+EOF
+}
+
+show_validate_help() {
+  cat <<EOF
+Usage: $(basename "$0") validate --file PATH
+
+Dry-run validation of a seed file. Reports valid/invalid counts and errors.
+EOF
+}
+
+# --- add ---
+cmd_add() {
+  local type="" content="" scope="project" source="" source_type="self_reported"
+  local polarity="" pinned="false" emotional_value=""
+
+  if [[ $# -eq 0 ]]; then
+    show_add_help
     exit 0
   fi
 
@@ -153,7 +177,8 @@ EOF
       --pinned) pinned="true"; shift ;;
       --emotional-value) emotional_value="$2"; shift 2 ;;
       -h|--help)
-        cmd_add
+        show_add_help
+        exit 0
         ;;
       *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -166,6 +191,8 @@ EOF
     exit 1
   fi
 
+  ensure_file "$KNOWLEDGE" '{"items":[]}'
+
   local item
   item=$(build_item "$type" "$content" "$scope" "$source" "$source_type" "$polarity" "$pinned" "$emotional_value")
 
@@ -177,16 +204,12 @@ EOF
 # --- seed ---
 cmd_seed() {
   local file="" dry_run="false"
+  local wk_err
+  wk_err=$(mktemp)
+  trap 'rm -f "$wk_err"' EXIT
 
   if [[ $# -eq 0 ]]; then
-    cat <<EOF
-Usage: $(basename "$0") seed --file PATH
-
-Bulk-add knowledge items from a JSON array file.
-Each object must have at least "type" and "content".
-Optional fields: scope, source, source_type, polarity, pinned, emotional_value.
-Items that fail validation are skipped with a warning.
-EOF
+    show_seed_help
     exit 0
   fi
 
@@ -194,7 +217,10 @@ EOF
     case "$1" in
       --file) file="$2"; shift 2 ;;
       --dry-run) dry_run="true"; shift ;;
-      -h|--help) cmd_seed; ;;
+      -h|--help)
+        show_seed_help
+        exit 0
+        ;;
       *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
   done
@@ -205,6 +231,8 @@ EOF
   if [[ ! -f "$file" ]]; then
     echo "ERROR: file not found: $file" >&2; exit 1
   fi
+
+  ensure_file "$KNOWLEDGE" '{"items":[]}'
 
   local count valid=0 invalid=0
   count=$(jq 'length' "$file")
@@ -234,9 +262,9 @@ EOF
     [[ -z "$source" ]] && source="manual-$(today)"
     [[ "$type" == "trait" ]] && scope="user"
 
-    if ! validate_item "$type" "$content" "$scope" "$polarity" 2>/tmp/wk_err; then
+    if ! validate_item "$type" "$content" "$scope" "$polarity" 2>"$wk_err"; then
       local err
-      err=$(cat /tmp/wk_err)
+      err=$(cat "$wk_err")
       echo "WARN: skipping item $i: $err" >&2
       ((invalid++)) || true
       continue
@@ -266,18 +294,17 @@ cmd_validate() {
   local file=""
 
   if [[ $# -eq 0 ]]; then
-    cat <<EOF
-Usage: $(basename "$0") validate --file PATH
-
-Dry-run validation of a seed file. Reports valid/invalid counts and errors.
-EOF
+    show_validate_help
     exit 0
   fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --file) file="$2"; shift 2 ;;
-      -h|--help) cmd_validate; ;;
+      -h|--help)
+        show_validate_help
+        exit 0
+        ;;
       *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
   done
@@ -293,8 +320,6 @@ EOF
 }
 
 # --- main ---
-ensure_file "$KNOWLEDGE" '{"items":[]}'
-
 if [[ $# -lt 1 ]]; then
   usage
 fi

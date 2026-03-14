@@ -6,7 +6,7 @@ BASE="$(cd "$(dirname "$0")/../.." && pwd)"
 CONFIG="$BASE/config.json"
 STAGING="$BASE/data/.staging"
 
-# --- Parse args → stage for sub-agent ---
+# --- Parse args ---
 EPISODES=""
 SESSION=""
 while [[ $# -gt 0 ]]; do
@@ -21,11 +21,6 @@ STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
 INVOCATION_ID="$(date +%s%N)-${RANDOM}"
-if [[ -n "$EPISODES" ]]; then
-  jq -n --arg episodes "$EPISODES" '{episodes: $episodes}' > "$STAGING_DIR/infer-knowledge-${INVOCATION_ID}.json"
-else
-  echo '{}' > "$STAGING_DIR/infer-knowledge-${INVOCATION_ID}.json"
-fi
 
 # --- Debug flag ---
 DEBUG=false

@@ -6,8 +6,8 @@
 # --dry-run: report only (no writes)
 #
 # Usage:
-#   bash agent-persona/scripts/scan-graph-edges.sh --prepare                    # move + scan (cutoff=now)
-#   bash agent-persona/scripts/scan-graph-edges.sh --prepare --cutoff 1773460000  # move + scan with epoch cutoff
+#   bash agent-persona/scripts/scan-graph-edges.sh --prepare                    # move episodes to to_scan/
+#   bash agent-persona/scripts/scan-graph-edges.sh --prepare --cutoff 1773460000  # move episodes to to_scan/ (epoch cutoff)
 #   bash agent-persona/scripts/scan-graph-edges.sh --apply      # merge + cleanup
 #   bash agent-persona/scripts/scan-graph-edges.sh --dry-run    # report only
 set -euo pipefail
@@ -61,7 +61,7 @@ if [[ "$PREPARE" == "true" ]]; then
 fi
 
 # ── Phase 2: Scan (runs unless --apply only) ─────────────────────────────────
-if [[ "$APPLY" != "true" ]]; then
+if [[ "$APPLY" != "true" ]] && [[ "$PREPARE" != "true" ]]; then
   [[ -f "$GRAPH" ]] || { echo "ERROR: memory_graph.json not found" >&2; exit 1; }
   mkdir -p "$TO_SCAN_DIR"
 
