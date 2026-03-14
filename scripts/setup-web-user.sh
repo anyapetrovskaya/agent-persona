@@ -68,6 +68,7 @@ bash agent-persona/scripts/init.sh
 # ── Apply web-specific config ────────────────────────────────────────────────
 
 echo "Applying web configuration ..."
+sed -i 's/"platform": "[^"]*"/"platform": "web"/' agent-persona/config.json
 sed -i 's/"git_sync": false/"git_sync": true/' agent-persona/config.json
 sed -i 's/"default_mode": "[^"]*"/"default_mode": "open-to-anything"/' agent-persona/data/base_persona.json
 printf 'open-to-anything\n' > agent-persona/data/active_personality.txt

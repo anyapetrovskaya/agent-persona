@@ -10,10 +10,12 @@ STAGING="$DATA_DIR/.staging"
 
 # --- Parse script args ---
 SESSION=""
+INVOCATION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --session) SESSION="$2"; shift 2 ;;
-    *)         shift ;;
+    --session)    SESSION="$2"; shift 2 ;;
+    --invocation) INVOCATION="$2"; shift 2 ;;
+    *)            shift ;;
   esac
 done
 
@@ -21,7 +23,11 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 TIME="" EPISODE="" END_OF_DAY=false CONVERSATION=""
-ARGS_FILE="$STAGING_DIR/prepare-handoff.json"
+if [[ -n "$INVOCATION" ]]; then
+  ARGS_FILE="$STAGING_DIR/prepare-handoff-${INVOCATION}.json"
+else
+  ARGS_FILE="$STAGING_DIR/prepare-handoff.json"
+fi
 if [[ -f "$ARGS_FILE" ]]; then
   TIME=$(jq -r '.time // ""' "$ARGS_FILE")
   EPISODE=$(jq -r '.episode // ""' "$ARGS_FILE")
@@ -32,6 +38,9 @@ fi
 [[ -z "$TIME" ]] && TIME=$(date +%H:%M:%S)
 if [[ -z "$EPISODE" ]] || [[ "$EPISODE" == "null" ]]; then
   EPISODE=$(ls -t "$DATA_DIR/episodic"/episode_*.json 2>/dev/null | head -1)
+fi
+if [[ -z "$EPISODE" ]]; then
+  EPISODE="$DATA_DIR/episodic/episode_$(date +%Y-%m-%d_T%H-%M-00).json"
 fi
 [[ "$END_OF_DAY" == "true" ]] && END_OF_DAY=true || END_OF_DAY=false
 
@@ -83,20 +92,6 @@ echo ""
 echo "=== SAVE_BOUNDARY ==="
 echo "$BOUNDARY"
 
-# --- Existing reminders ---
-echo ""
-echo "=== EXISTING_REMINDERS ==="
-if [[ -n "$CONVERSATION" ]]; then
-  HANDOFF_FILE="$DATA_DIR/conversations/${CONVERSATION}.md"
-else
-  HANDOFF_FILE="$DATA_DIR/current_session_handoff.md"
-fi
-if [[ -f "$HANDOFF_FILE" ]] && grep -q "^## Reminder for user" "$HANDOFF_FILE"; then
-  awk '/^## Reminder for user/{found=1; print; next} found && /^## /{exit} found{print}' "$HANDOFF_FILE"
-else
-  echo "NONE"
-fi
-
 # --- Handoff triggers ---
 echo ""
 echo "=== HANDOFF_TRIGGERS ==="
@@ -143,3 +138,26 @@ echo "end_of_day=$END_OF_DAY"
 echo "debug=$DEBUG_FLAG"
 echo "git_sync=$GIT_SYNC"
 echo "conversation=$CONVERSATION"
+
+# --- Sibling main threads ---
+# NOTE: Provided for cross-thread awareness only. The LLM should NOT create a
+# dedicated "Sibling threads" section — format.sh renders that from live data.
+echo ""
+echo "=== SIBLING_MAIN_THREADS ==="
+CURRENT_CONVO="${CONVERSATION:-main_1}"
+CONV_DIR="$DATA_DIR/conversations"
+if [[ -d "$CONV_DIR" ]]; then
+  FOUND_SIBLING=false
+  for f in "$CONV_DIR"/main_*.md; do
+    [[ -f "$f" ]] || continue
+    BASENAME="$(basename "$f" .md)"
+    [[ "$BASENAME" == "$CURRENT_CONVO" ]] && continue
+    $FOUND_SIBLING && echo "---"
+    FOUND_SIBLING=true
+    echo "file=$BASENAME"
+    cat "$f"
+  done
+  $FOUND_SIBLING || echo "NONE"
+else
+  echo "NONE"
+fi

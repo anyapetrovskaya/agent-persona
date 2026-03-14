@@ -9,10 +9,12 @@ PERSONALITIES="$BASE/personalities"
 
 # --- Parse script args ---
 SESSION=""
+INVOCATION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --session) SESSION="$2"; shift 2 ;;
-    *)         shift ;;
+    --session)    SESSION="$2"; shift 2 ;;
+    --invocation) INVOCATION="$2"; shift 2 ;;
+    *)            shift ;;
   esac
 done
 
@@ -21,7 +23,11 @@ STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 WORDS=""
 MODE_ID=""
-ARGS_FILE="$STAGING_DIR/apply-personality.json"
+if [[ -n "$INVOCATION" ]]; then
+  ARGS_FILE="$STAGING_DIR/apply-personality-${INVOCATION}.json"
+else
+  ARGS_FILE="$STAGING_DIR/apply-personality.json"
+fi
 if [[ -f "$ARGS_FILE" ]]; then
   WORDS=$(jq -r '.words // ""' "$ARGS_FILE")
   MODE_ID=$(jq -r '.mode_id // ""' "$ARGS_FILE")

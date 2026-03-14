@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# manage-conversation/task.sh — named conversation management
+# manage-living-doc/task.sh — living document management
 set -euo pipefail
 
 BASE="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -17,8 +17,8 @@ while [[ $# -gt 0 ]]; do
     *)         echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
-[[ -z "$ACTION" ]] && { echo "ERROR: --action required (save|load|new|list)" >&2; exit 1; }
-if [[ "$ACTION" != "list" ]] && [[ "$ACTION" != "fork-main" ]] && [[ -z "$NAME" ]]; then
+[[ -z "$ACTION" ]] && { echo "ERROR: --action required (create|update|read|list)" >&2; exit 1; }
+if [[ "$ACTION" != "list" ]] && [[ -z "$NAME" ]]; then
   echo "ERROR: --name required for action '$ACTION'" >&2; exit 1
 fi
 
@@ -28,7 +28,7 @@ STAGING_DIR="$STAGING"
 mkdir -p "$STAGING_DIR"
 INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg action "$ACTION" --arg name "${NAME:-}" --arg summary "${SUMMARY:-}" \
-  '{action: $action, name: $name, summary: $summary}' > "$STAGING_DIR/manage-conversation-${INVOCATION_ID}.json"
+  '{action: $action, name: $name, summary: $summary}' > "$STAGING_DIR/manage-living-doc-${INVOCATION_ID}.json"
 
 # --- Debug flag ---
 DEBUG=false
@@ -38,7 +38,11 @@ fi
 [[ "$DEBUG" == "true" ]] && DEBUG=true || DEBUG=false
 
 echo "=== INSTRUCTIONS ==="
-echo "spawn: Read agent-persona/tasks/manage-conversation/task.md and execute."
+if [[ "$ACTION" == "read" ]] || [[ "$ACTION" == "list" ]]; then
+  echo "spawn: Read agent-persona/tasks/manage-living-doc/task.md and execute."
+else
+  echo "spawn: Read agent-persona/tasks/manage-living-doc/task.md and execute. For 'update' actions, include relevant recent conversation context about what decisions were made that should be reflected in the doc."
+fi
 if [[ -n "$SESSION" ]]; then
   echo "session: $SESSION"
 fi

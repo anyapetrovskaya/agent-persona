@@ -24,12 +24,16 @@ done
 if [[ -z "$EPISODE" ]]; then
   EPISODE=$(ls -t "$DATA_DIR/episodic"/episode_*.json 2>/dev/null | head -1)
 fi
+if [[ -z "$EPISODE" ]]; then
+  EPISODE="$DATA_DIR/episodic/episode_$(date +%Y-%m-%d_T%H-%M-00).json"
+fi
 
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg time "$TIME" --arg episode "${EPISODE:-}" --argjson end_of_day "$END_OF_DAY" --arg conversation "${CONVERSATION:-}" \
-  '{time: $time, episode: $episode, end_of_day: $end_of_day, conversation: $conversation}' > "$STAGING_DIR/prepare-handoff.json"
+  '{time: $time, episode: $episode, end_of_day: $end_of_day, conversation: $conversation}' > "$STAGING_DIR/prepare-handoff-${INVOCATION_ID}.json"
 
 # --- Debug flag ---
 DEBUG=false
@@ -39,10 +43,11 @@ fi
 [[ "$DEBUG" == "true" ]] && DEBUG=true || DEBUG=false
 
 echo "=== INSTRUCTIONS ==="
-echo "spawn: Read agent-persona/tasks/prepare-handoff/task.md and execute."
+echo "spawn: Read agent-persona/tasks/prepare-handoff/task.md and execute. Include the last 2 user/assistant exchanges from this conversation verbatim in your prompt to the sub-agent (truncate each to ~500 chars if longer)."
 if [[ -n "$SESSION" ]]; then
   echo "session: $SESSION"
 fi
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

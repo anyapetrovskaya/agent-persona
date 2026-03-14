@@ -23,8 +23,9 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg query "$QUERY" --arg graph_mode "$GRAPH_MODE" \
-  '{query: $query, graph_mode: $graph_mode}' > "$STAGING_DIR/query-knowledge.json"
+  '{query: $query, graph_mode: $graph_mode}' > "$STAGING_DIR/query-knowledge-${INVOCATION_ID}.json"
 
 # --- Debug flag ---
 DEBUG=false
@@ -36,6 +37,7 @@ fi
 echo "=== INSTRUCTIONS ==="
 echo "spawn: Read agent-persona/tasks/query-knowledge/task.md and execute."
 [[ -n "$SESSION" ]] && echo "session: $SESSION"
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

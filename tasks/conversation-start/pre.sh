@@ -9,10 +9,12 @@ STAGING="$DATA/.staging"
 
 # --- Parse script args ---
 SESSION=""
+INVOCATION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --session) SESSION="$2"; shift 2 ;;
-    *)         shift ;;
+    --session)    SESSION="$2"; shift 2 ;;
+    --invocation) INVOCATION="$2"; shift 2 ;;
+    *)            shift ;;
   esac
 done
 
@@ -20,7 +22,11 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 MESSAGE="" TIME="" MODE="default" CONVERSATION=""
-ARGS_FILE="$STAGING_DIR/conversation-start.json"
+if [[ -n "$INVOCATION" ]]; then
+  ARGS_FILE="$STAGING_DIR/conversation-start-${INVOCATION}.json"
+else
+  ARGS_FILE="$STAGING_DIR/conversation-start.json"
+fi
 if [[ -f "$ARGS_FILE" ]]; then
   MESSAGE=$(jq -r '.message // ""' "$ARGS_FILE")
   TIME=$(jq -r '.time // ""' "$ARGS_FILE")
@@ -88,7 +94,7 @@ echo "=== HANDOFF ==="
 if [[ -n "$CONVERSATION" ]]; then
   HANDOFF_FILE="$DATA/conversations/${CONVERSATION}.md"
 else
-  HANDOFF_FILE="$DATA/current_session_handoff.md"
+  HANDOFF_FILE="$DATA/conversations/main_1.md"
 fi
 HANDOFF_EXISTS=false
 ITEMS_COUNT=0
@@ -99,6 +105,46 @@ if [[ -f "$HANDOFF_FILE" ]] && [[ -s "$HANDOFF_FILE" ]]; then
   cat "$HANDOFF_FILE"
 else
   echo "exists: false"
+  echo "NONE"
+
+  # When handoff is missing, provide top knowledge items as fallback context
+  echo ""
+  echo "=== KNOWLEDGE_CONTEXT ==="
+  KNOWLEDGE_FILE="$DATA/knowledge/knowledge.json"
+  if [[ -f "$KNOWLEDGE_FILE" ]]; then
+    jq -r '[.items | sort_by(-.strength) | .[:10] | .[] | "- [\(.type)/\(.strength)] \(.content)"] | join("\n")' "$KNOWLEDGE_FILE" 2>/dev/null || echo "NONE"
+  else
+    echo "NONE"
+  fi
+fi
+
+# --- SIBLING MAIN THREADS ---
+echo ""
+echo "=== SIBLING_MAIN_THREADS ==="
+CONV_DIR="$DATA/conversations"
+CURRENT_CONV="${CONVERSATION:-main_1}"
+IS_MAIN=false
+if [[ "$CURRENT_CONV" == main_* ]]; then
+  IS_MAIN=true
+fi
+
+if [[ "$IS_MAIN" == true ]]; then
+  FOUND=false
+  for f in "$CONV_DIR"/main_*.md; do
+    [[ -f "$f" ]] || continue
+    BASENAME=$(basename "$f" .md)
+    [[ "$BASENAME" == "$CURRENT_CONV" ]] && continue
+    if [[ "$FOUND" == true ]]; then
+      echo "---"
+    fi
+    FOUND=true
+    echo "file: $BASENAME"
+    cat "$f"
+  done
+  if [[ "$FOUND" == false ]]; then
+    echo "NONE"
+  fi
+else
   echo "NONE"
 fi
 
@@ -167,7 +213,7 @@ TRIGGERS_FILE="$DATA/learned_triggers.json"
 echo ""
 echo "=== INITIATIVE ==="
 if [[ -f "$TRIGGERS_FILE" ]]; then
-  TRIGGER_MSG=$(jq -r '.triggers[] | select(.trigger_type == "conversation_start" and .approved == true) | .suggested_line' "$TRIGGERS_FILE" 2>/dev/null | head -1)
+  TRIGGER_MSG=$(jq -r '.triggers[] | select(.trigger_type == "conversation_start" and .approved == true and (.enabled // true) == true) | .suggested_line // empty' "$TRIGGERS_FILE" 2>/dev/null | head -1)
   if [[ -n "$TRIGGER_MSG" ]]; then
     echo "$TRIGGER_MSG"
   else
@@ -177,11 +223,50 @@ else
   echo "NONE"
 fi
 
+# --- BACKLOG ---
+echo ""
+echo "=== BACKLOG ==="
+BACKLOG_OUT=$(bash "$BASE/scripts/backlog.sh" list --status open --json 2>/dev/null) || true
+if [[ -n "$BACKLOG_OUT" ]]; then
+  echo "$BACKLOG_OUT"
+else
+  echo "NONE"
+fi
+
 # --- EVAL CONTEXT ---
 echo ""
 echo "=== EVAL_CONTEXT ==="
 echo "handoff_existed: $HANDOFF_EXISTS"
 echo "items_count: $ITEMS_COUNT"
+
+# --- KNOWLEDGE PRIMING (zero-LLM-cost, keyword match) ---
+echo ""
+echo "=== KNOWLEDGE_PRIMING ==="
+if [[ -n "$MESSAGE" ]]; then
+  KEYWORDS=$(echo "$MESSAGE" | tr '[:upper:]' '[:lower:]' | \
+    tr -cs '[:alpha:]' '\n' | awk 'length > 3' | sort -u | head -20)
+
+  if [[ -n "$KEYWORDS" ]]; then
+    PATTERN=$(echo "$KEYWORDS" | paste -sd'|')
+
+    KNOWLEDGE_FILE="$DATA/knowledge/knowledge.json"
+    if [[ -f "$KNOWLEDGE_FILE" ]]; then
+      jq -r --arg pat "$PATTERN" '[.items[] | select(.content | test($pat; "i"))] |
+        sort_by(-.strength) | .[:5] | .[] |
+        "- [\(.type)/\(.strength)] \(.content)"' "$KNOWLEDGE_FILE" 2>/dev/null || true
+    fi
+
+    GRAPH_FILE="$DATA/knowledge/memory_graph.json"
+    if [[ -f "$GRAPH_FILE" ]]; then
+      jq -r --arg pat "$PATTERN" '[.nodes[] | select(
+        (.summary | test($pat; "i")) or (.name | test($pat; "i"))
+      )] | .[:5] | .[] |
+        "- [graph:\(.type)] \(.name): \(.summary)"' "$GRAPH_FILE" 2>/dev/null || true
+    fi
+  fi
+else
+  echo "NONE"
+fi
 
 # --- USER MESSAGE ---
 echo ""

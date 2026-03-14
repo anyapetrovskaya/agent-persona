@@ -20,8 +20,9 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg episode_id "$EPISODE_ID" \
-  '{episode_id: $episode_id}' > "$STAGING_DIR/memory-diff.json"
+  '{episode_id: $episode_id}' > "$STAGING_DIR/memory-diff-${INVOCATION_ID}.json"
 
 # --- Debug flag ---
 DEBUG=false
@@ -33,6 +34,7 @@ fi
 echo "=== INSTRUCTIONS ==="
 echo "spawn: Read agent-persona/tasks/memory-diff/task.md and execute."
 [[ -n "$SESSION" ]] && echo "session: $SESSION"
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+TURN=1
+MESSAGE=""
+SESSION_ARG=""
+CONVERSATION_ARG=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --turn)         TURN="$2"; shift 2 ;;
+    --message)      MESSAGE="$2"; shift 2 ;;
+    --session)      SESSION_ARG="$2"; shift 2 ;;
+    --conversation) CONVERSATION_ARG="$2"; shift 2 ;;
+    *)              shift ;;
+  esac
+done
+
 # Resolve base path relative to this script's location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="$SCRIPT_DIR/../../data"
@@ -59,48 +73,35 @@ if [[ -f "$SAVE_FILE" ]]; then
   fi
 fi
 
-# --- Reminders check ---
-HANDOFF="$BASE/current_session_handoff.md"
+# --- Reminders check (from backlog) ---
+BACKLOG_SCRIPT="$SCRIPT_DIR/../../scripts/backlog.sh"
 reminders="none"
-
-if [[ -f "$HANDOFF" ]]; then
-  in_reminder_section=false
-  matched_lines=()
-
-  while IFS= read -r line; do
-    if [[ "$line" =~ ^##[[:space:]]+[Rr]eminder ]]; then
-      in_reminder_section=true
-      continue
-    fi
-    if $in_reminder_section && [[ "$line" =~ ^## ]]; then
-      break
-    fi
-    if $in_reminder_section && [[ -n "$line" ]]; then
-      if [[ "$line" =~ ([0-9]{1,2}:[0-9]{2}) ]]; then
-        reminder_time="${BASH_REMATCH[1]}"
-        reminder_min=$(to_minutes "$reminder_time")
-        diff=$(( current_min - reminder_min ))
-        if (( diff < 0 )); then diff=$(( -diff )); fi
-        if (( diff <= 5 )); then
-          clean="${line#- }"
-          matched_lines+=("$clean")
-        fi
-      fi
-    fi
-  done < "$HANDOFF"
-
-  if (( ${#matched_lines[@]} > 0 )); then
-    reminders=$(printf '%s; ' "${matched_lines[@]}")
-    reminders="${reminders%; }"
+if [[ -f "$BACKLOG_SCRIPT" ]]; then
+  alarm_output=$(bash "$BACKLOG_SCRIPT" alarms 2>/dev/null) || true
+  if [[ -n "$alarm_output" ]]; then
+    reminders="$alarm_output"
   fi
 fi
 
-# --- Output ---
+# --- Output header ---
 echo "time: $CURRENT_TIME"
 if $DEBUG; then
   echo "epoch: $EPOCH"
 fi
 
+# --- Turn 0: dispatch to conversation-start ---
+if [[ "$TURN" == "0" ]]; then
+  echo "actions: none"
+  echo ""
+
+  CS_ARGS=(--message "$MESSAGE")
+  [[ -n "$SESSION_ARG" ]] && CS_ARGS+=(--session "$SESSION_ARG")
+  [[ -n "$CONVERSATION_ARG" ]] && CS_ARGS+=(--conversation "$CONVERSATION_ARG")
+  bash "$SCRIPT_DIR/../conversation-start/task.sh" "${CS_ARGS[@]}"
+  exit 0
+fi
+
+# --- Turn 1+: normal per-turn-check ---
 has_actions=false
 action_lines=""
 
@@ -127,3 +128,4 @@ fi
 echo ""
 echo "=== INSTRUCTIONS ==="
 echo "Capture epoch value above. Follow any actions listed. Track sub-agent count and total tool calls this turn — pass all three to footer.sh at end of turn. Pass --session <id> to all task.sh calls."
+echo "If discussing building, creating, or setting up something, query knowledge first to check if relevant tools, scripts, or prior work already exist."

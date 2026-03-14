@@ -63,7 +63,7 @@ fi
 CONV_DIR="$AP_DIR/data/conversations"
 if [ ! -d "$CONV_DIR" ]; then
   mkdir -p "$CONV_DIR"
-  cat > "$CONV_DIR/_default.md" << 'HANDOFF'
+  cat > "$CONV_DIR/main_1.md" << 'HANDOFF'
 # Session Handoff
 
 *Last updated: (new install)*
@@ -78,7 +78,7 @@ Fresh install — no prior sessions yet.
 ## Open questions
 - None yet
 HANDOFF
-  echo "conversations/ seeded with _default.md. OK"
+  echo "conversations/ seeded with main_1.md. OK"
 fi
 
 # ── Detect timezone ──────────────────────────────────────────────────────────
@@ -102,14 +102,32 @@ if [ -f "$CONFIG" ]; then
   fi
 fi
 
-# ── Set up Cursor rules ─────────────────────────────────────────────────────
+# ── Set up Cursor rules (platform-aware) ────────────────────────────────────
 
 mkdir -p "$REPO_ROOT/.cursor/rules"
 
+PLATFORM="ide"
+if [ -f "$CONFIG" ] && command -v jq &>/dev/null; then
+  PLATFORM=$(jq -r '.platform // "ide"' "$CONFIG")
+fi
+# Validate — fall back to "ide" for unknown values
+case "$PLATFORM" in
+  web|ide|dev) ;;
+  *) PLATFORM="ide" ;;
+esac
+
+MDC_TEMPLATE="agent-persona-${PLATFORM}.mdc"
+MDC_SOURCE="$AP_DIR/rules/$MDC_TEMPLATE"
+
+if [ ! -f "$MDC_SOURCE" ]; then
+  MDC_SOURCE="$AP_DIR/rules/agent-persona.mdc"
+  MDC_TEMPLATE="agent-persona.mdc (fallback)"
+fi
+
 RULE_STATUS="not found -- skipped"
-if [ -f "$AP_DIR/rules/agent-persona.mdc" ]; then
-  cp "$AP_DIR/rules/agent-persona.mdc" "$REPO_ROOT/.cursor/rules/agent-persona.mdc"
-  RULE_STATUS="Agent rule installed"
+if [ -f "$MDC_SOURCE" ]; then
+  cp "$MDC_SOURCE" "$REPO_ROOT/.cursor/rules/agent-persona.mdc"
+  RULE_STATUS="Installed $MDC_TEMPLATE (platform=$PLATFORM)"
 fi
 
 # ── Update parent .gitignore ─────────────────────────────────────────────────
@@ -139,6 +157,7 @@ fi
 echo ""
 echo "  data/          $DATA_STATUS"
 echo "  .cursor/rules/ $RULE_STATUS"
+echo "  platform       $PLATFORM"
 echo "  timezone       $DETECTED_TZ"
 echo ""
 echo "Open this folder in Cursor and say hi."

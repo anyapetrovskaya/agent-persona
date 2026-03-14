@@ -1,5 +1,8 @@
 {
+  "platform": "ide",
   "git_sync": false,
   "debug": true,
-  "timezone": "America/Los_Angeles"
+  "timezone": "America/Los_Angeles",
+  "short_term_retention_days": 3,
+  "transcript_source_dir": ""
 }

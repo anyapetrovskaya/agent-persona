@@ -31,12 +31,18 @@ export TZ="${TZ_VAL:-UTC}"
 # Current time as HH:MM
 HHMM=$(date +%H:%M)
 
+current_epoch=$(date +%s)
+dt=$((current_epoch - epoch))
+
 if $DEBUG; then
-  current_epoch=$(date +%s)
-  dt=$((current_epoch - epoch))
   printf '— %s — wall: %ds | agents: %s | calls: %s\n' "$HHMM" "$dt" "$agents" "$calls"
 else
   printf '— %s\n' "$HHMM"
+fi
+
+if (( dt > 0 )); then
+  bash "$BASE/scripts/eval-append.sh" --type turn_metric \
+    --wall_seconds "$dt" --agents "$agents" --calls "$calls" &>/dev/null &
 fi
 
 # Completion chime (background, fail-silent)

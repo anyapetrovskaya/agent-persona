@@ -8,10 +8,12 @@ STAGING="$DATA/.staging"
 
 # --- Parse script args ---
 SESSION=""
+INVOCATION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --session) SESSION="$2"; shift 2 ;;
-    *)         shift ;;
+    --session)    SESSION="$2"; shift 2 ;;
+    --invocation) INVOCATION="$2"; shift 2 ;;
+    *)            shift ;;
   esac
 done
 
@@ -19,9 +21,14 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 EPISODES=""
-if [[ -f "$STAGING_DIR/reflect.args" ]]; then
-  EPISODES=$(<"$STAGING_DIR/reflect.args")
-  rm -f "$STAGING_DIR/reflect.args"
+if [[ -n "$INVOCATION" ]]; then
+  ARGS_FILE="$STAGING_DIR/reflect-${INVOCATION}.args"
+else
+  ARGS_FILE="$STAGING_DIR/reflect.args"
+fi
+if [[ -f "$ARGS_FILE" ]]; then
+  EPISODES=$(<"$ARGS_FILE")
+  rm -f "$ARGS_FILE"
 fi
 
 # --- Last reflection date ---

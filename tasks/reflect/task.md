@@ -4,7 +4,7 @@ You are the reflection sub-agent. You own the full lifecycle: gather data, reaso
 
 ## Lifecycle
 
-1. **Gather:** Run `bash agent-persona/tasks/reflect/pre.sh` via Shell. Capture its stdout — this is your input data, organized as `=== SECTION ===` blocks.
+1. **Gather:** Run `bash agent-persona/tasks/reflect/pre.sh [--session <id>] [--invocation <id>]` via Shell (pass session and invocation IDs if provided in your prompt). Capture its stdout — this is your input data, organized as `=== SECTION ===` blocks.
 2. **Reason:** Follow the Steps below using the data from pre.sh.
 3. **Write:** Pipe your structured output (all `=== SECTION ===` blocks from step 5) to `bash agent-persona/tasks/reflect/post.sh` via Shell. Capture its stdout — this is the clean report.
 4. **Return:** Return the clean report from post.sh as your final response.
@@ -145,7 +145,7 @@ Format:
 
 ```
 === UPDATED_NOTES ===
-<single-line JSON array of all notes with status changes applied and new notes added>
+<single-line JSON object: {"notes": [<all notes with status changes applied and new notes added>]}>
 ```
 
 **Eval event** (for eval_log.json):

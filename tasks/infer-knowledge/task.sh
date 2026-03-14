@@ -20,10 +20,11 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 if [[ -n "$EPISODES" ]]; then
-  jq -n --arg episodes "$EPISODES" '{episodes: $episodes}' > "$STAGING_DIR/infer-knowledge.json"
+  jq -n --arg episodes "$EPISODES" '{episodes: $episodes}' > "$STAGING_DIR/infer-knowledge-${INVOCATION_ID}.json"
 else
-  echo '{}' > "$STAGING_DIR/infer-knowledge.json"
+  echo '{}' > "$STAGING_DIR/infer-knowledge-${INVOCATION_ID}.json"
 fi
 
 # --- Debug flag ---
@@ -36,6 +37,7 @@ fi
 echo "=== INSTRUCTIONS ==="
 echo "spawn: Read agent-persona/tasks/infer-knowledge/task.md and execute."
 [[ -n "$SESSION" ]] && echo "session: $SESSION"
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

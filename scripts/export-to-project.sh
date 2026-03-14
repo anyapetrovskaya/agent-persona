@@ -152,6 +152,23 @@ fi
 
 echo "  ✓ data/ (excluding .git)"
 
+# ── 2b. Filter knowledge graph for export ────────────────────────────────────
+
+GRAPH_FILE="$TARGET/agent-persona/data/knowledge/memory_graph.json"
+if [ -f "$GRAPH_FILE" ] && command -v jq &>/dev/null; then
+  echo "Filtering knowledge graph (keeping system + principle only)..."
+  jq '
+    .nodes as $all_nodes |
+    [ $all_nodes[] | select(.category == "system" or .category == "principle") ] as $kept |
+    [ $kept[].id ] as $ids |
+    .nodes = $kept |
+    .edges = [ .edges[] | select( (.source as $s | $ids | index($s)) and (.target as $t | $ids | index($t)) ) ]
+  ' "$GRAPH_FILE" > "${GRAPH_FILE}.tmp" && mv "${GRAPH_FILE}.tmp" "$GRAPH_FILE"
+  echo "  ✓ memory_graph.json filtered (kept $(jq '.nodes | length' "$GRAPH_FILE") nodes, $(jq '.edges | length' "$GRAPH_FILE") edges)"
+elif [ -f "$GRAPH_FILE" ]; then
+  echo "  ⚠ jq not found — memory_graph.json exported unfiltered"
+fi
+
 # ── 3. Copy cursor rule ─────────────────────────────────────────────────────
 
 echo "Copying cursor rule..."

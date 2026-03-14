@@ -77,7 +77,8 @@ if [[ -n "$CONVERSATION" ]]; then
   HANDOFF_FILE="$DATA_DIR/conversations/${CONVERSATION}.md"
   mkdir -p "$DATA_DIR/conversations"
 else
-  HANDOFF_FILE="$DATA_DIR/current_session_handoff.md"
+  HANDOFF_FILE="$DATA_DIR/conversations/main_1.md"
+  mkdir -p "$DATA_DIR/conversations"
 fi
 if [[ -n "$HANDOFF_MD" ]]; then
   {
@@ -137,3 +138,12 @@ else
 fi
 
 echo "$REPORT"
+
+# --- 7. Short-term memory import ---
+echo "## Short-term import"
+if IMPORT_OUTPUT=$(bash "$AP_DIR/scripts/import-short-term.sh" 2>&1); then
+  echo "$IMPORT_OUTPUT"
+else
+  echo "warning: short-term import failed"
+  [[ -n "${IMPORT_OUTPUT:-}" ]] && echo "$IMPORT_OUTPUT"
+fi

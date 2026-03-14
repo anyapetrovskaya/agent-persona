@@ -1,10 +1,14 @@
 # Agent Persona
 
-*Think of Agent Persona as a partner who gets better at working with you over time. Not a tool you configure — a relationship you build.*
+An AI partner that starts generic and becomes increasingly *yours* over time.
+
+## What Is It?
+
+Agent Persona gives your AI a memory. It remembers your conversations, learns how you like to communicate, and keeps track of things you care about — so every time you talk, it picks up right where you left off.
+
+Think of it as the difference between talking to a stranger every day versus having a partner who actually knows you.
 
 ## Getting Started
-
-### Install into a project
 
 ```bash
 cd /path/to/your-project
@@ -12,49 +16,30 @@ git clone https://github.com/anyapetrovskaya/agent-persona.git agent-persona
 bash agent-persona/scripts/init.sh
 ```
 
-## First Conversation
+Open the project in Cursor and say hi. That's it — no configuration needed.
 
-Open the project in Cursor and say hi.
+**Note:** Works best with a high-capability model like Claude Opus 4.6.
 
- Agent Persona will introduce itself and start learning how you work. No configuration needed — just talk naturally.
+## How to Use It
 
-### Switching Communication Style
+Just talk naturally. Your partner remembers things automatically.
 
-You can change the tone anytime:
+- **Adjust the personality** — "be more concise," "be warmer," "be brief but funny"
+- **Track tasks** — "add to backlog: call the dentist"
+- **Organize topics** — "let's start a new conversation about the redesign"
+- **Create reference docs** — "create a doc about our architecture decisions"
+- **Say good night** — when you're done for the day, say so. Your partner processes and consolidates everything — like sleeping on it.
 
-- "Be more concise" — direct and efficient
-- "Be more supportive" — warm and encouraging
-- "Be more critical" — challenges your assumptions
-- Or describe what you want: "be brief but funny"
+Say `help` anytime to see what's available.
 
-## Recommended Setup
+## Your Data
 
-Agent Persona works best with **high-capability models** (e.g. Claude Opus 4.6). The system relies on complex rule-following, sub-agent orchestration, and multi-step task execution — weaker models may not follow the full workflow reliably.
+Everything lives in `agent-persona/data/`. It's all readable files — markdown and JSON. Nothing is sent anywhere. Your data is yours.
 
-## Managing Your Data
+To copy your partner to another project, just ask: "export to my-other-project."
 
-All data lives in `agent-persona/data/` — memory, knowledge, personality, preferences. You own it.
+To update, just ask: "update agent-persona."
 
-### Export to another project
+## Learn More
 
-```bash
-bash agent-persona/scripts/export-to-project.sh /path/to/other-project
-```
-
-### Update the framework
-
-Get the latest improvements without touching your data. The script downloads the latest release, syncs framework files, and re-runs init.
-
-```bash
-bash agent-persona/scripts/update.sh
-```
-
-Or just ask your agent: "Could you update agent-persona for me?"
-
-## Privacy
-
-All data stays on your machine (or your private repo if using Cursor Web). Nothing is sent to third parties. The knowledge, personality, and memory files in `data/` are yours — readable, portable, and deletable at any time.
-
-## Documentation
-
-For architecture details, directory layout, and design decisions, see [docs/](docs/README.md).
+See [docs/](docs/overview.md) for how memory, personality, and forgetting work under the hood.

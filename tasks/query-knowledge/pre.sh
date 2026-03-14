@@ -8,10 +8,12 @@ STAGING="$DATA/.staging"
 
 # --- Parse script args ---
 SESSION=""
+INVOCATION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --session) SESSION="$2"; shift 2 ;;
-    *)         shift ;;
+    --session)    SESSION="$2"; shift 2 ;;
+    --invocation) INVOCATION="$2"; shift 2 ;;
+    *)            shift ;;
   esac
 done
 
@@ -20,7 +22,11 @@ STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 QUERY=""
 GRAPH_MODE="on"
-ARGS_FILE="$STAGING_DIR/query-knowledge.json"
+if [[ -n "$INVOCATION" ]]; then
+  ARGS_FILE="$STAGING_DIR/query-knowledge-${INVOCATION}.json"
+else
+  ARGS_FILE="$STAGING_DIR/query-knowledge.json"
+fi
 if [[ -f "$ARGS_FILE" ]]; then
   QUERY=$(jq -r '.query // ""' "$ARGS_FILE")
   GRAPH_MODE=$(jq -r '.graph_mode // "on"' "$ARGS_FILE")
@@ -84,4 +90,18 @@ elif [[ "$GRAPH_MODE" == "on" ]]; then
   echo "not found"
 else
   echo "disabled"
+fi
+
+# --- Short-term memory search (non-blocking) ---
+echo ""
+echo "=== SHORT_TERM_MATCHES ==="
+if [[ -n "$QUERY" ]]; then
+  ST_RESULTS=$("$BASE/scripts/read-short-term.sh" --query "$QUERY" --json 2>/dev/null || true)
+  if [[ -n "$ST_RESULTS" ]]; then
+    echo "$ST_RESULTS" | head -10
+  else
+    echo "none"
+  fi
+else
+  echo "none"
 fi

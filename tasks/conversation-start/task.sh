@@ -2,8 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bash "$SCRIPT_DIR/../per-turn-check/task.sh"
-echo ""
 
 BASE="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DATA="$BASE/data"
@@ -36,10 +34,21 @@ if [[ -f "$DATA/.first_run" ]]; then
   PERSONALITY_FILE="$BASE/personalities/${PERSONALITY}.md"
   [[ -f "$PERSONALITY_FILE" ]] && DIRECTIVE=$(cat "$PERSONALITY_FILE")
 
+  # --- Identity block from base_persona (who you are, what you can do) ---
+  IDENTITY=""
+  if [[ -f "$DATA/base_persona.json" ]]; then
+    IDENTITY=$(jq -r '.identity // empty | if type == "object" then (.summary // "") + (if .capabilities then "\nCapabilities: " + .capabilities else "" end) + (if .name then "\nName: " + .name else "" end) + (if .pronouns then " (" + .pronouns + ")" else "" end) else "" end' "$DATA/base_persona.json" 2>/dev/null || true)
+  fi
+
   rm "$DATA/.first_run"
 
   echo "$GREETING"
   echo "---"
+  if [[ -n "$IDENTITY" ]]; then
+    echo "identity:"
+    echo "$IDENTITY"
+    echo "---"
+  fi
   echo "personality: $PERSONALITY"
   if [[ -n "$DIRECTIVE" ]]; then
     echo "directive:"
@@ -51,11 +60,10 @@ if [[ -f "$DATA/.first_run" ]]; then
 fi
 
 # =============================================================
-# RETURNING PATH — stage args + slim instructions
+# RETURNING PATH — run pre.sh + format.sh inline
 # =============================================================
 [[ -z "$TIME" ]] && TIME=$(date +%H:%M:%S)
 
-# --- Detect mode from message ---
 MODE="default"
 if [[ -n "$MESSAGE" ]]; then
   case "$MESSAGE" in
@@ -64,16 +72,41 @@ if [[ -n "$MESSAGE" ]]; then
   esac
 fi
 
-# --- Generate session ID if not provided ---
 if [[ -z "$SESSION" ]]; then
   SESSION="$(date +%s)-${RANDOM}"
 fi
 
-# --- Stage args for pre.sh ---
+# Stage args for pre.sh
 STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg message "$MESSAGE" --arg time "$TIME" --arg mode "$MODE" --arg conversation "${CONVERSATION:-}" \
-  '{message: $message, time: $time, mode: $mode, conversation: $conversation}' > "$STAGING_DIR/conversation-start.json"
+  '{message: $message, time: $time, mode: $mode, conversation: $conversation}' > "$STAGING_DIR/conversation-start-${INVOCATION_ID}.json"
+
+# Run pre.sh → format.sh pipeline (all bash, no LLM)
+PRE_OUTPUT=$(bash "$SCRIPT_DIR/pre.sh" --session "$SESSION" --invocation "$INVOCATION_ID")
+FORMATTED=$(echo "$PRE_OUTPUT" | bash "$SCRIPT_DIR/format.sh")
+
+# --- Eval logging (bash heuristic, no LLM grading) ---
+HANDOFF_EXISTED=$(echo "$PRE_OUTPUT" | awk '/^=== HANDOFF ===/{found=1; next} found && /^exists:/{print $2; exit}')
+ITEMS_COUNT=$(echo "$PRE_OUTPUT" | awk '/^=== EVAL_CONTEXT ===/{found=1; next} found && /^items_count:/{print $2; exit}')
+HANDOFF_EXISTED="${HANDOFF_EXISTED:-false}"
+ITEMS_COUNT="${ITEMS_COUNT:-0}"
+
+# Heuristic quality: if handoff exists and has >10 lines, good; >0 lines, fair; else poor
+if [[ "$HANDOFF_EXISTED" == "true" ]]; then
+  if (( ITEMS_COUNT > 10 )); then
+    HQ="good"; HR="partial"
+  else
+    HQ="fair"; HR="partial"
+  fi
+else
+  HQ="poor"; HR="none"
+fi
+
+bash "$SCRIPT_DIR/post.sh" --mode "$MODE" --handoff-existed "$HANDOFF_EXISTED" \
+  --items-count "$ITEMS_COUNT" --handoff-quality "$HQ" --handoff-relevance "$HR" \
+  --reason "heuristic" <<< "" &>/dev/null &
 
 # --- Debug flag ---
 DEBUG=false
@@ -85,9 +118,12 @@ if [[ -n "$MESSAGE" ]] && [[ "$MESSAGE" == *"debug on"* ]]; then
   DEBUG=true
 fi
 
-echo "=== INSTRUCTIONS ==="
-echo "spawn: Read agent-persona/tasks/conversation-start/task.md and execute. Session: $SESSION"
-echo "session: $SESSION"
+# --- Output clean context for main agent ---
+echo "$FORMATTED"
 echo ""
-echo "=== FLAGS ==="
+echo "=== SESSION ==="
+echo "session: $SESSION"
 echo "debug: $DEBUG"
+echo ""
+echo "=== INSTRUCTIONS ==="
+echo "Output is your session context — absorb it, no sub-agent needed."

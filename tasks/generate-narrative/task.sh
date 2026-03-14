@@ -22,8 +22,9 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg perspective "$PERSPECTIVE" --arg period "$PERIOD" \
-  '{perspective: $perspective, period: $period}' > "$STAGING_DIR/generate-narrative.json"
+  '{perspective: $perspective, period: $period}' > "$STAGING_DIR/generate-narrative-${INVOCATION_ID}.json"
 
 # --- Debug flag ---
 DEBUG=false
@@ -35,6 +36,7 @@ fi
 echo "=== INSTRUCTIONS ==="
 echo "spawn: Read agent-persona/tasks/generate-narrative/task.md and execute."
 if [[ -n "$SESSION" ]]; then echo "session: $SESSION"; fi
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

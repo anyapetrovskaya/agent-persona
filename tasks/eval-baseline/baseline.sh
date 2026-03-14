@@ -96,6 +96,16 @@ if [[ -f "$EVAL_LOG" ]]; then
   }' "$EVAL_LOG")
 fi
 
+# --- Append current baseline to history before overwriting ---
+HISTORY_FILE="$BASE/eval/baseline_history.json"
+if [[ -f "$BASELINE_OUT" ]]; then
+  if [[ ! -f "$HISTORY_FILE" ]]; then
+    echo '[]' > "$HISTORY_FILE"
+  fi
+  jq --argjson snap "$(cat "$BASELINE_OUT")" '. += [$snap]' "$HISTORY_FILE" \
+    > "${HISTORY_FILE}.tmp" && mv "${HISTORY_FILE}.tmp" "$HISTORY_FILE"
+fi
+
 # --- Write baseline.json ---
 mkdir -p "$(dirname "$BASELINE_OUT")"
 

@@ -23,8 +23,9 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 jq -n --arg words "$WORDS" --arg mode_id "${MODE_ID:-}" \
-  '{words: $words, mode_id: $mode_id}' > "$STAGING_DIR/apply-personality.json"
+  '{words: $words, mode_id: $mode_id}' > "$STAGING_DIR/apply-personality-${INVOCATION_ID}.json"
 
 # --- Debug flag ---
 DEBUG=false
@@ -36,6 +37,7 @@ fi
 echo "=== INSTRUCTIONS ==="
 echo "spawn: Read agent-persona/tasks/apply-personality/task.md and execute."
 [[ -n "$SESSION" ]] && echo "session: $SESSION"
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

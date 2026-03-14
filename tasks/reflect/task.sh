@@ -20,10 +20,11 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 mkdir -p "$STAGING_DIR"
+INVOCATION_ID="$(date +%s%N)-${RANDOM}"
 if [[ -n "$EPISODES" ]]; then
-  printf '%s' "$EPISODES" > "$STAGING_DIR/reflect.args"
+  printf '%s' "$EPISODES" > "$STAGING_DIR/reflect-${INVOCATION_ID}.args"
 else
-  rm -f "$STAGING_DIR/reflect.args"
+  rm -f "$STAGING_DIR/reflect-${INVOCATION_ID}.args"
 fi
 
 # --- Debug flag (for main's footer) ---
@@ -36,6 +37,7 @@ fi
 echo "=== INSTRUCTIONS ==="
 echo "spawn: Read agent-persona/tasks/reflect/task.md and execute."
 [[ -n "$SESSION" ]] && echo "session: $SESSION"
+echo "invocation: $INVOCATION_ID"
 echo ""
 echo "=== FLAGS ==="
 echo "debug: $DEBUG"

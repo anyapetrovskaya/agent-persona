@@ -4,7 +4,7 @@ You are the personality-switch sub-agent. You own the full lifecycle: gather dat
 
 ## Lifecycle
 
-1. **Gather:** Run `bash agent-persona/tasks/apply-personality/pre.sh` via Shell. Capture its stdout — this is your input data, organized as `=== SECTION ===` blocks.
+1. **Gather:** Run `bash agent-persona/tasks/apply-personality/pre.sh [--session <id>] [--invocation <id>]` via Shell (pass session and invocation IDs if provided in your prompt). Capture its stdout — this is your input data, organized as `=== SECTION ===` blocks.
 2. **Reason:** Follow the Steps below using the data from pre.sh.
 3. **Write:** Pipe your structured output (everything from step 4) to `bash agent-persona/tasks/apply-personality/post.sh` via Shell. Capture its stdout — this is the clean report.
 4. **Return:** Return the clean report from post.sh as your final response.

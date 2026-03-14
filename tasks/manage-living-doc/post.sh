@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# manage-conversation/post.sh — write conversation file (run by sub-agent)
+# manage-living-doc/post.sh — write document file (run by sub-agent)
 set -euo pipefail
 
 BASE="$(cd "$(dirname "$0")/../.." && pwd)"
 DATA="$BASE/data"
 STAGING="$DATA/.staging"
-CONVOS="$DATA/conversations"
+DOCS="$DATA/living-docs"
 
 # --- Parse args ---
 SESSION=""
@@ -22,14 +22,12 @@ done
 STAGING_DIR="$STAGING"
 [[ -n "$SESSION" ]] && STAGING_DIR="$STAGING/$SESSION"
 if [[ -n "$INVOCATION" ]]; then
-  RESULT_FILE="$STAGING_DIR/manage-conversation-result-${INVOCATION}.json"
+  RESULT_FILE="$STAGING_DIR/manage-living-doc-result-${INVOCATION}.json"
 else
-  RESULT_FILE="$STAGING_DIR/manage-conversation-result.json"
-  # Backward compat: fall back to base staging dir (pre-fix path)
-  [[ ! -f "$RESULT_FILE" ]] && RESULT_FILE="$STAGING/manage-conversation-result.json"
+  RESULT_FILE="$STAGING_DIR/manage-living-doc-result.json"
 fi
 if [[ ! -f "$RESULT_FILE" ]]; then
-  echo "error: no result file found" >&2
+  echo "error: no result file found at $RESULT_FILE" >&2
   exit 1
 fi
 
@@ -37,13 +35,13 @@ ACTION=$(jq -r '.action' "$RESULT_FILE")
 NAME=$(jq -r '.name' "$RESULT_FILE")
 CONTENT=$(jq -r '.content' "$RESULT_FILE")
 
-mkdir -p "$CONVOS"
+mkdir -p "$DOCS"
 
-CONVO_FILE="$CONVOS/${NAME}.md"
-printf '%s\n' "$CONTENT" > "$CONVO_FILE"
+DOC_FILE="$DOCS/${NAME}.md"
+printf '%s\n' "$CONTENT" > "$DOC_FILE"
 
 rm -f "$RESULT_FILE"
 
-echo "wrote: $CONVO_FILE"
+echo "wrote: $DOC_FILE"
 echo "action: $ACTION"
 echo "name: $NAME"
