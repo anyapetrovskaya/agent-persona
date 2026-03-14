@@ -43,6 +43,30 @@ if [[ -f "$DATA/.first_run" ]]; then
     IDENTITY=$(jq -r '.identity // empty | if type == "object" then (.summary // "") + (if .capabilities then "\nCapabilities: " + .capabilities else "" end) + (if .name then "\nName: " + .name else "" end) + (if .pronouns then " (" + .pronouns + ")" else "" end) else "" end' "$DATA/base_persona.json" 2>/dev/null || true)
   fi
 
+  # --- Language from base_persona (for non-en greeting instructions) ---
+  LANGUAGE="en"
+  if [[ -f "$DATA/base_persona.json" ]] && command -v jq &>/dev/null; then
+    LANGUAGE=$(jq -r '.language // "en"' "$DATA/base_persona.json" 2>/dev/null || echo "en")
+  fi
+  language_name() {
+    case "$1" in
+      ru) echo "Russian" ;;
+      es) echo "Spanish" ;;
+      fr) echo "French" ;;
+      de) echo "German" ;;
+      it) echo "Italian" ;;
+      pt) echo "Portuguese" ;;
+      ja) echo "Japanese" ;;
+      zh) echo "Chinese" ;;
+      ko) echo "Korean" ;;
+      ar) echo "Arabic" ;;
+      nl) echo "Dutch" ;;
+      pl) echo "Polish" ;;
+      uk) echo "Ukrainian" ;;
+      *) echo "$1" ;;
+    esac
+  }
+
   # --- Silent housekeeping (no stdout) before greeting ---
   # On web platform, defer ALL file modifications to turn 1 to avoid
   # triggering Cursor's auto-initiated second turn from visible changes.
@@ -75,6 +99,7 @@ if [[ -f "$DATA/.first_run" ]]; then
   fi
   echo "---"
   HHMM=$(date +%H:%M)
+  [[ "$LANGUAGE" != "en" ]] && echo "Respond in $(language_name "$LANGUAGE")."
   echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT run the footer. Do NOT make any git commits, file changes, or additional tool calls. Your ONLY action is to output the greeting."
   [[ "$PLATFORM" == "web" ]] && echo "Your LAST line of response must be: — $HHMM —"
   exit 0

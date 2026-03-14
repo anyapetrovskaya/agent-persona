@@ -32,6 +32,82 @@ fi
 [[ "$DEBUG" == "true" ]] && DEBUG=true || DEBUG=false
 export TZ="${TZ_VAL:-UTC}"
 
+# --- Language from base_persona ---
+LANGUAGE="en"
+if [[ -f "$BASE/base_persona.json" ]] && command -v jq &>/dev/null; then
+  LANGUAGE=$(jq -r '.language // "en"' "$BASE/base_persona.json" 2>/dev/null || echo "en")
+fi
+
+language_name() {
+  case "$1" in
+    ru) echo "Russian" ;;
+    es) echo "Spanish" ;;
+    fr) echo "French" ;;
+    de) echo "German" ;;
+    it) echo "Italian" ;;
+    pt) echo "Portuguese" ;;
+    ja) echo "Japanese" ;;
+    zh) echo "Chinese" ;;
+    ko) echo "Korean" ;;
+    ar) echo "Arabic" ;;
+    nl) echo "Dutch" ;;
+    pl) echo "Polish" ;;
+    uk) echo "Ukrainian" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# --- Persona block (emitted on turn 1+ before INSTRUCTIONS) ---
+emit_persona_block() {
+  echo "=== PERSONA ==="
+  [[ ! -f "$BASE/base_persona.json" ]] && { echo "identity: (no base_persona.json — run init or check data path)"; echo ""; return 0; }
+
+  local summary
+  summary=$(jq -r '.identity.summary // empty' "$BASE/base_persona.json" 2>/dev/null || true)
+  [[ -n "$summary" ]] && echo "identity: $summary"
+
+  local name pronouns
+  name=$(jq -r '.identity.name // empty' "$BASE/base_persona.json" 2>/dev/null || true)
+  if [[ -n "$name" ]]; then
+    pronouns=$(jq -r '.identity.pronouns // empty' "$BASE/base_persona.json" 2>/dev/null || true)
+    if [[ -n "$pronouns" ]]; then
+      echo "name: $name ($pronouns)"
+    else
+      echo "name: $name"
+    fi
+  fi
+
+  if [[ "$LANGUAGE" != "en" && -n "$LANGUAGE" ]]; then
+    echo "language: $LANGUAGE"
+  fi
+
+  local personality_file="$BASE/active_personality.txt"
+  if [[ -f "$personality_file" ]]; then
+    local pname
+    pname=$(head -1 "$personality_file" | tr -d '[:space:]')
+    if [[ -n "$pname" ]]; then
+      local pmd="$SCRIPT_DIR/../../personalities/${pname}.md"
+      if [[ -f "$pmd" ]]; then
+        local directive
+        directive=$(tr '\n' ' ' < "$pmd" | sed 's/  */ /g; s/^ *//; s/ *$//')
+        echo "personality: $pname — $directive"
+      else
+        echo "personality: $pname"
+      fi
+    fi
+  fi
+
+  local traits
+  traits=$(jq -r '(.traits // empty) | to_entries | map("\(.key) \(.value)") | join(", ")' "$BASE/base_persona.json" 2>/dev/null || true)
+  [[ -n "$traits" ]] && echo "traits: $traits"
+
+  local notes
+  notes=$(jq -r '.notes // empty' "$BASE/base_persona.json" 2>/dev/null || true)
+  [[ -n "$notes" ]] && echo "notes: $notes"
+
+  echo ""
+}
+
 if $DEBUG; then
   CURRENT_TIME=$(date +%H:%M:%S)
   EPOCH=$(date +%s)
@@ -146,7 +222,11 @@ else
 fi
 
 echo ""
+emit_persona_block
 echo "=== INSTRUCTIONS ==="
+if [[ "$LANGUAGE" != "en" && -n "$LANGUAGE" ]]; then
+  echo "Respond in $(language_name "$LANGUAGE")."
+fi
 if [[ "$PLATFORM" == "web" ]]; then
   echo "Follow any actions listed. Pass --session <id> to all task.sh calls."
   echo "Your LAST line of response must be: — $HHMM —"
