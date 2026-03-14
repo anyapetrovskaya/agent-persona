@@ -67,7 +67,7 @@ if [[ -f "$DATA/.first_run" ]]; then
     echo "$DIRECTIVE"
   fi
   echo "---"
-  echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT make any git commits, file changes, or additional tool calls. Your ONLY action is to output the greeting."
+  echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT run the footer. Do NOT make any git commits, file changes, or additional tool calls. Your ONLY action is to output the greeting."
   exit 0
 fi
 
