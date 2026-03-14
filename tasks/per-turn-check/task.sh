@@ -23,9 +23,11 @@ CONFIG="$SCRIPT_DIR/../../config.json"
 # --- Read config ---
 DEBUG=false
 TZ_VAL=""
+PLATFORM="ide"
 if [[ -f "$CONFIG" ]]; then
   DEBUG=$(jq -r '.debug // false' "$CONFIG" 2>/dev/null || echo false)
   TZ_VAL=$(jq -r '.timezone // empty' "$CONFIG" 2>/dev/null || true)
+  PLATFORM=$(jq -r '.platform // "ide"' "$CONFIG" 2>/dev/null || echo ide)
 fi
 [[ "$DEBUG" == "true" ]] && DEBUG=true || DEBUG=false
 export TZ="${TZ_VAL:-UTC}"
@@ -127,5 +129,10 @@ fi
 
 echo ""
 echo "=== INSTRUCTIONS ==="
-echo "Capture epoch value above. Follow any actions listed. Track sub-agent count and total tool calls this turn — pass all three to footer.sh at end of turn. Pass --session <id> to all task.sh calls."
+if [[ "$PLATFORM" == "web" ]]; then
+  echo "Follow any actions listed. Pass --session <id> to all task.sh calls."
+  echo "Your LAST line of response must be: — $HHMM —"
+else
+  echo "Capture epoch value above. Follow any actions listed. Track sub-agent count and total tool calls this turn — pass all three to footer.sh at end of turn. Pass --session <id> to all task.sh calls."
+fi
 echo "If discussing building, creating, or setting up something, query knowledge first to check if relevant tools, scripts, or prior work already exist."

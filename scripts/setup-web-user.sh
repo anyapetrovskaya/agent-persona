@@ -60,16 +60,20 @@ echo "Cloning agent-persona into $WORK_DIR/agent-persona ..."
 git clone "$SOURCE_REPO" agent-persona
 rm -rf agent-persona/.git
 
+# ── Apply web-specific config (before init so init.sh can use platform) ──────
+
+echo "Applying web configuration ..."
+sed -i 's/"platform": "[^"]*"/"platform": "web"/' agent-persona/config.json
+sed -i 's/"git_sync": false/"git_sync": true/' agent-persona/config.json
+
 # ── Initialize agent-persona ─────────────────────────────────────────────────
 
 echo "Running init.sh ..."
 bash agent-persona/scripts/init.sh
 
-# ── Apply web-specific config ────────────────────────────────────────────────
+# ── Apply remaining web config ───────────────────────────────────────────────
 
-echo "Applying web configuration ..."
-sed -i 's/"platform": "[^"]*"/"platform": "web"/' agent-persona/config.json
-sed -i 's/"git_sync": false/"git_sync": true/' agent-persona/config.json
+echo "Applying personality defaults ..."
 sed -i 's/"default_mode": "[^"]*"/"default_mode": "open-to-anything"/' agent-persona/data/base_persona.json
 printf 'open-to-anything\n' > agent-persona/data/active_personality.txt
 

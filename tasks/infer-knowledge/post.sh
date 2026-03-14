@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# infer-knowledge/post.sh — post-processing: enforce invariants, apply delta, archive, timeline, cleanup
+# infer-knowledge/post.sh — post-processing: enforce invariants, validate graph, archive, timeline, cleanup
 set -euo pipefail
 
 AP_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DATA_DIR="$AP_DIR/data"
 KNOWLEDGE="$DATA_DIR/knowledge/knowledge.json"
+GRAPH="$DATA_DIR/knowledge/memory_graph.json"
 SNAPSHOT="$DATA_DIR/.staging/field-snapshot.json"
 TODAY=$(date +%Y-%m-%d)
 REPORT=$(cat)
@@ -95,28 +96,89 @@ if [[ -f "$KNOWLEDGE" ]]; then
     "$KNOWLEDGE" > "${KNOWLEDGE}.tmp" && mv "${KNOWLEDGE}.tmp" "$KNOWLEDGE"
 fi
 
-# ── 7. Apply graph delta and archive scanned episodes ─────────────────────────
-set +e
-DELTA_OUT=$(bash "$AP_DIR/scripts/scan-graph-edges.sh" --apply 2>&1)
-DELTA_EXIT=$?
-set -e
-[[ $DELTA_EXIT -ne 0 ]] && DELTA_OUT="${DELTA_OUT:-delta apply failed}"
+# ── 7. Graph validation ──────────────────────────────────────────────────────
+GRAPH_WARN=""
+if [[ -f "$GRAPH" ]]; then
+  ALLOWED_TYPES='["part_of","created","supports","motivated_by","replaced","contradicts","parent_of","sibling_of","married_to","daughter_of","uses","writes_to","reads_from","embodies","explores","portrait_of","relates_to"]'
 
-# ── 8. Rebuild timeline ──────────────────────────────────────────────────────
+  # 7a. Valid node references — every edge source/target must exist as a node ID
+  DANGLING=$(jq --raw-output '
+    (.nodes | map(.id)) as $ids |
+    [.edges[] |
+      (if (.source as $s | $ids | index($s) == null) then {edge: .id, field: "source", ref: .source} else empty end),
+      (if (.target as $t | $ids | index($t) == null) then {edge: .id, field: "target", ref: .target} else empty end)
+    ]' "$GRAPH")
+  DANGLING_COUNT=$(echo "$DANGLING" | jq 'length')
+  if (( DANGLING_COUNT > 0 )); then
+    DANGLING_MSG="post.sh: WARNING — $DANGLING_COUNT dangling node references in graph edges:"
+    DANGLING_DETAIL=$(echo "$DANGLING" | jq -r '.[] | "  edge \(.edge): \(.field)=\(.ref) not found"')
+    echo "$DANGLING_MSG" >&2
+    echo "$DANGLING_DETAIL" >&2
+    GRAPH_WARN+="$DANGLING_COUNT dangling refs; "
+  fi
+
+  # 7b. Edge type taxonomy — warn on unrecognized types
+  BAD_TYPES=$(jq --argjson allowed "$ALLOWED_TYPES" -r '
+    [.edges[] | select(.type as $t | $allowed | index($t) == null) | {edge: .id, type: .type}] | unique_by(.type)' "$GRAPH")
+  BAD_TYPE_COUNT=$(echo "$BAD_TYPES" | jq 'length')
+  if (( BAD_TYPE_COUNT > 0 )); then
+    echo "post.sh: WARNING — $BAD_TYPE_COUNT unrecognized edge types (kept):" >&2
+    echo "$BAD_TYPES" | jq -r '.[] | "  edge \(.edge): type=\(.type)"' >&2
+    GRAPH_WARN+="$BAD_TYPE_COUNT unknown types; "
+  fi
+
+  # 7c. Duplicate edge detection — same source+target+type, keep longer fact
+  DEDUPED=$(jq '
+    .edges | group_by([.source, .target, .type]) |
+    map(select(length > 1) | sort_by(-(.fact // "" | length)) | .[1:][]) |
+    map(.id)' "$GRAPH")
+  DEDUP_COUNT=$(echo "$DEDUPED" | jq 'length')
+  if (( DEDUP_COUNT > 0 )); then
+    DEDUP_IDS=$(echo "$DEDUPED" | jq -r '.[]')
+    echo "post.sh: deduped $DEDUP_COUNT duplicate edges (removed): $DEDUP_IDS" >&2
+    jq --argjson remove "$DEDUPED" '
+      .edges |= [.[] | select(.id as $eid | $remove | index($eid) == null)]' \
+      "$GRAPH" > "${GRAPH}.tmp" && mv "${GRAPH}.tmp" "$GRAPH"
+    GRAPH_WARN+="$DEDUP_COUNT dupes removed; "
+  fi
+
+  # 7d. Orphan node detection — nodes with zero edges (warn only)
+  ORPHANS=$(jq -r '
+    (.edges | map(.source, .target) | unique) as $connected |
+    [.nodes[] | select(.id as $nid | $connected | index($nid) == null) | .id]' "$GRAPH")
+  ORPHAN_COUNT=$(echo "$ORPHANS" | jq 'length')
+  if (( ORPHAN_COUNT > 0 )); then
+    ORPHAN_IDS=$(echo "$ORPHANS" | jq -r 'join(", ")')
+    echo "post.sh: WARNING — $ORPHAN_COUNT orphan nodes (no edges): $ORPHAN_IDS" >&2
+    GRAPH_WARN+="$ORPHAN_COUNT orphans; "
+  fi
+
+  [[ -z "$GRAPH_WARN" ]] && GRAPH_WARN="clean"
+fi
+
+# ── 8. Archive scanned episodes ──────────────────────────────────────────────
+if [[ -d "$DATA_DIR/episodic/to_scan" ]]; then
+  mkdir -p "$DATA_DIR/episodic/archived"
+  for f in "$DATA_DIR/episodic/to_scan"/*.json; do
+    [[ -f "$f" ]] && mv "$f" "$DATA_DIR/episodic/archived/"
+  done
+fi
+
+# ── 9. Rebuild timeline ──────────────────────────────────────────────────────
 set +e
 TIMELINE_OUT=$(python3 "$AP_DIR/scripts/visualize-timeline.py" 2>&1)
 TIMELINE_EXIT=$?
 set -e
 [[ $TIMELINE_EXIT -ne 0 ]] && TIMELINE_OUT="timeline rebuild failed"
 
-# ── 9. Short-term cleanup ────────────────────────────────────────────────────
+# ── 10. Short-term cleanup ────────────────────────────────────────────────────
 set +e
 CLEANUP_OUT=$(bash "$AP_DIR/scripts/cleanup-short-term.sh" 2>&1)
 CLEANUP_EXIT=$?
 set -e
 [[ $CLEANUP_EXIT -ne 0 ]] && CLEANUP_OUT="${CLEANUP_OUT:-cleanup failed}"
 
-# ── 10. Clean staging files ──────────────────────────────────────────────────
+# ── 11. Clean staging files ──────────────────────────────────────────────────
 rm -f "$DATA_DIR"/.staging/infer-knowledge-*.json
 rm -f "$SNAPSHOT"
 echo "post.sh: staging files cleaned" >&2
@@ -125,6 +187,6 @@ echo "post.sh: staging files cleaned" >&2
 echo "$REPORT"
 echo ""
 echo "## Post-processing"
-echo "Graph delta: $DELTA_OUT"
+echo "Graph validation: ${GRAPH_WARN:-skipped (no graph file)}"
 echo "Timeline: ${TIMELINE_OUT:-rebuilt}"
 echo "Short-term cleanup: $CLEANUP_OUT"

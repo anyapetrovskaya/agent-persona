@@ -58,8 +58,9 @@ contains() {
 }
 
 # Build a knowledge item JSON object from validated parameters
+# strength: optional 9th param from seed; if absent, defaults to 1
 build_item() {
-  local type="$1" content="$2" scope="$3" source="$4" source_type="$5" polarity="$6" pinned="$7" emotional_value="$8"
+  local type="$1" content="$2" scope="$3" source="$4" source_type="$5" polarity="$6" pinned="$7" emotional_value="$8" strength="${9:-1}"
   local created
   created=$(today)
 
@@ -72,6 +73,7 @@ build_item() {
     --arg polarity "$polarity" \
     --argjson pinned "$pinned" \
     --arg emotional_value "$emotional_value" \
+    --argjson strength "$strength" \
     --arg created "$created" \
     '{
       type: $type,
@@ -80,7 +82,7 @@ build_item() {
       source: $source,
       source_type: $source_type,
       created: $created,
-      strength: 1,
+      strength: $strength,
       last_accessed: null,
       access_count: 0,
       pinned: $pinned,
@@ -143,7 +145,7 @@ Usage: $(basename "$0") seed --file PATH
 
 Bulk-add knowledge items from a JSON array file.
 Each object must have at least "type" and "content".
-Optional fields: scope, source, source_type, polarity, pinned, emotional_value.
+Optional fields: scope, source, source_type, polarity, pinned, emotional_value, strength.
 Items that fail validation are skipped with a warning.
 EOF
 }
@@ -206,7 +208,7 @@ cmd_seed() {
   local file="" dry_run="false"
   local wk_err
   wk_err=$(mktemp)
-  trap 'rm -f "$wk_err"' EXIT
+  trap "rm -f '$wk_err'" EXIT
 
   if [[ $# -eq 0 ]]; then
     show_seed_help
@@ -249,7 +251,7 @@ cmd_seed() {
     local raw
     raw=$(jq --argjson i "$i" '.[$i]' "$file")
 
-    local type content scope source source_type polarity pinned emotional_value
+    local type content scope source source_type polarity pinned emotional_value strength
     type=$(echo "$raw" | jq -r '.type // ""')
     content=$(echo "$raw" | jq -r '.content // ""')
     scope=$(echo "$raw" | jq -r '.scope // "project"')
@@ -258,6 +260,7 @@ cmd_seed() {
     polarity=$(echo "$raw" | jq -r '.polarity // ""')
     pinned=$(echo "$raw" | jq -r 'if .pinned == true then "true" else "false" end')
     emotional_value=$(echo "$raw" | jq -r '.emotional_value // ""')
+    strength=$(echo "$raw" | jq '.strength // 1')
 
     [[ -z "$source" ]] && source="manual-$(today)"
     [[ "$type" == "trait" ]] && scope="user"
@@ -272,7 +275,7 @@ cmd_seed() {
 
     if [[ "$dry_run" == "false" ]]; then
       local item
-      item=$(build_item "$type" "$content" "$scope" "$source" "$source_type" "$polarity" "$pinned" "$emotional_value")
+      item=$(build_item "$type" "$content" "$scope" "$source" "$source_type" "$polarity" "$pinned" "$emotional_value" "$strength")
       current_knowledge=$(echo "$current_knowledge" | jq --argjson new_item "$item" '.items += [$new_item]')
     fi
 

@@ -131,8 +131,9 @@ if [ -f "$MDC_SOURCE" ]; then
 fi
 
 # ── Update parent .gitignore ─────────────────────────────────────────────────
+# Skip for web platform: agent-persona/ must be tracked for Cursor Web to work.
 
-if [ "$AP_DIR" != "$REPO_ROOT" ]; then
+if [ "$AP_DIR" != "$REPO_ROOT" ] && [ "$PLATFORM" != "web" ]; then
   GITIGNORE="$REPO_ROOT/.gitignore"
   ENTRY="agent-persona/"
   if [ -f "$GITIGNORE" ]; then

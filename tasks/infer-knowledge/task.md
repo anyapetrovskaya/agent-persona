@@ -37,17 +37,79 @@ Merge near-duplicate fading items (similar content, overlapping topics). Sum str
 
 Save `agent-persona/data/knowledge/knowledge.json` (UTF-8). Preserve items not updated.
 
-## Step 6: Sub-tasks
+## Step 6: Extract graph nodes and edges
+
+After processing knowledge items, update the memory graph.
+
+### Entity resolution
+
+Pre.sh provides the existing graph (nodes + edges) in the `=== EXISTING GRAPH ===` section.
+Before creating a new node, check if it matches an existing node by ID, name, or aliases.
+If it matches, reuse the existing node ID. If it's a new entity, create a new node.
+
+### Node schema
+
+```json
+{
+  "id": "kebab-case-id",
+  "name": "Human Readable Name",
+  "type": "person|component|concept|tool|decision",
+  "summary": "One-line description",
+  "aliases": ["alt-name-1", "alt-name-2"],
+  "first_seen": "YYYY-MM-DD",
+  "last_seen": "YYYY-MM-DD"
+}
+```
+
+### Edge schema
+
+```json
+{
+  "source": "node-id",
+  "target": "node-id",
+  "type": "<from taxonomy>",
+  "fact": "Specific, meaningful description of the relationship",
+  "confidence": 0.8,
+  "first_seen": "YYYY-MM-DD",
+  "last_seen": "YYYY-MM-DD"
+}
+```
+
+### Edge type taxonomy (closed set)
+
+- `part_of` — component/subsystem hierarchy
+- `created` — authorship/origin
+- `supports` — enables/implements
+- `motivated_by` — design rationale
+- `replaced` — evolution/history
+- `contradicts` — tension/conflict
+- `parent_of`, `sibling_of`, `married_to`, `daughter_of` — family relationships
+- `uses` — operational dependency
+- `writes_to`, `reads_from` — data flow
+- `embodies` — identity/representation
+- `explores` — investigation/discussion
+- `relates_to` — ONLY as last resort, must include a specific `fact`
+
+### Instructions
+
+1. Read the existing graph from the `=== EXISTING GRAPH ===` section of pre.sh output
+2. For each new or updated knowledge item, identify entities and relationships
+3. Create new nodes for entities not already in the graph (use entity resolution)
+4. Create edges with meaningful fact descriptions — never "Co-occurred in N episodes"
+5. Update `last_seen` on existing nodes/edges that are referenced in current episodes
+6. Flag edges for removal if they are stale or superseded (add to `edges_to_remove` list)
+7. Output the complete updated graph (all nodes and edges, not a delta) in your report
+
+## Step 7: Sub-tasks
 
 Run each by reading the task.md and executing:
 
-1. **Build memory graph:** `agent-persona/tasks/build-memory-graph/task.md` — pass knowledge, episodic, and graph paths.
-2. **Infer base persona:** `agent-persona/tasks/infer-base-persona/task.md`
-3. **Suggest behavior:** `agent-persona/tasks/suggest-learned-behavior/task.md` — include candidate in report if returned.
-4. **Proactive initiative:** `agent-persona/tasks/proactive-initiative/task.md` (trigger=`after_infer_knowledge`).
-5. **Reflect:** `agent-persona/tasks/reflect/task.md` — pass episode list, knowledge counts, eval log path.
+1. **Infer base persona:** `agent-persona/tasks/infer-base-persona/task.md`
+2. **Suggest behavior:** `agent-persona/tasks/suggest-learned-behavior/task.md` — include candidate in report if returned.
+3. **Proactive initiative:** `agent-persona/tasks/proactive-initiative/task.md` (trigger=`after_infer_knowledge`).
+4. **Reflect:** `agent-persona/tasks/reflect/task.md` — pass episode list, knowledge counts, eval log path.
 
-## Step 7: Persist
+## Step 8: Persist
 
 Pipe report to `bash agent-persona/tasks/infer-knowledge/post.sh` via Shell. Return post.sh output as your final response.
 
@@ -75,6 +137,9 @@ Script-managed fields — do NOT modify: `last_accessed`, `access_count`, `pinne
 Counts: +N added, ~N updated, -N pruned
 Contradictions: N found (examples: ...)
 Examples: [1-2 example knowledge items]
+Graph: +N nodes, +N edges, -N removed, ~N updated
+Graph output:
+{"nodes": [...], "edges": [...], "edges_to_remove": ["edge-id-1", ...]}
 Base persona: <default_mode> (changed/unchanged)
 Suggested trigger: <candidate JSON or "none">
 Initiative: <line or "none">
