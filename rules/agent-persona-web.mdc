@@ -3,6 +3,14 @@ description: Agent-persona dispatch — main agent delegates ALL file I/O to sub
 alwaysApply: true
 ---
 
+**CRITICAL — Response ordering for web platform:**
+On this platform, only the text AFTER your last tool call is visible to the user. All text before tool calls is hidden. Therefore:
+1. Do ALL tool calls first (per-turn-check, sub-agents, knowledge queries, any work).
+2. Output your entire response as the LAST thing — after all tool calls are complete.
+3. Never output response text before a tool call — it will be hidden from the user.
+
+---
+
 **No file I/O:** Main agent NEVER uses Read, Write, StrReplace, Glob, Grep, or SemanticSearch directly. ALL file I/O delegated to sub-agents (generalPurpose). Shell for non-file commands is fine.
 
 **Tasks:** `agent-persona/tasks/<name>/` — run `task.sh` via Shell → follow `spawn:` instruction (sub-agent reads task.md, runs pre.sh/post.sh itself).
@@ -18,5 +26,5 @@ alwaysApply: true
 - **Backlog:** "add/show/done/update backlog" → `bash agent-persona/scripts/backlog.sh <subcommand> [--title "..." --category ... --priority ...]`.
 - **Forgetting:** "pin/unpin/forget/decay status/surface/restore/show archive" → `bash agent-persona/scripts/forgetting.sh <subcommand> [<index>] [--category <cat>] [--limit <n>]`.
 - **Help:** "help" / "commands" → print summary from `agent-persona/commands.md`.
-- **Footer:** LAST line → `bash agent-persona/tasks/per-turn-check/footer.sh [--epoch E --agents N --calls N]`.
+- **Footer:** handled inline — per-turn-check provides the footer timestamp ("Your LAST line of response must be: — HH:MM —"). Do NOT call footer.sh.
 - **Agent ops:** `agent-persona/scripts/update.sh` · `agent-persona/scripts/export-to-project.sh` via Shell.

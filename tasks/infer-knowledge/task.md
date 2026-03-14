@@ -4,37 +4,35 @@ You are the infer-knowledge sub-agent. Your job is **semantic judgment only** �
 
 ## Setup
 
-1. Run `bash agent-persona/tasks/infer-knowledge/pre.sh` via Shell. Capture its output — it contains pre-processing stats, surfacing candidates, and episode list.
-2. Read episode files listed in the pre.sh output from `agent-persona/data/episodic/` and `agent-persona/data/episodic/to_scan/`.
-3. Read `agent-persona/data/knowledge/knowledge.json` (already updated by pre.sh with reinforcement and decay).
+1. Run `bash agent-persona/tasks/infer-knowledge/pre.sh` via Shell. Capture its output — it contains pre-processing stats and surfacing candidates.
+2. Read `agent-persona/data/knowledge/knowledge.json` (already updated by pre.sh with reinforcement and decay).
 
 ### Input sources
 
 Pre.sh provides these context sections:
 - **Existing knowledge:** Current knowledge items for dedup/merge
 - **Existing graph:** Current nodes and edges for entity resolution
-- **Short-term memory:** Recent conversation transcripts (last ~3 days), both conversation-tagged captures and imported full transcripts. These are the primary source for extracting new knowledge items and graph entities.
-- **Episodes (to_scan/):** Structured episodic records (legacy — being phased out as primary source in favor of short-term memory)
+- **Short-term memory:** Recent conversation transcripts (last ~3 days), both conversation-tagged captures and imported full transcripts.
 
 ## Step 1: Extract
 
-From short-term memory (primary source) and episode records (legacy), create candidate knowledge items:
+From short-term memory and living doc changes, create candidate knowledge items:
 
 - **Decisions** → `rule` or `fact` (generalize wording)
 - **Corrections** → `preference` with `polarity: "dislike"`
 - **User likes** (positive reactions, emotional_value > 0) → `preference` with `polarity: "like"`
 - **User dislikes** (frustration, rejections) → `preference` with `polarity: "dislike"`
-- **Repeated entities** across episodes → `convention` or `fact`
-- **Traits** (multi-episode patterns only) → `trait`
+- **Repeated entities** across conversations → `convention` or `fact`
+- **Traits** (multi-conversation patterns only) → `trait`
 
-Do not promote episode-specific events. Set `source_type`: `self_reported` / `observed` / `inferred`. Set `created` to today's date. Post.sh enforces `scope: "user"` for traits automatically.
+Set `source_type`: `self_reported` / `observed` / `inferred`. Set `created` to today's date. Post.sh enforces `scope: "user"` for traits automatically.
 
 ### Extraction priorities
 
-- **Named entities:** Use real names from episodes, never genericize (e.g., "Peter Varvak" not "anya-husband", "Vladimir I. Petrovsky" not "anya-father"). Extract all named people, pets, and organizations as `fact` items with their real names.
+- **Named entities:** Use real names, never genericize (e.g., "Peter Varvak" not "anya-husband", "Vladimir I. Petrovsky" not "anya-father"). Extract all named people, pets, and organizations as `fact` items with their real names.
 - **Design principles/theses:** If the user articulates a principle, thesis, or approach by name (e.g., "feelings-as-floats", "toast approach", "personhood"), extract it as a knowledge item AND ensure it becomes a concept node in Step 6.
-- **Operational rules:** If an episode explicitly states a rule or convention (e.g., "at conversation start, if last_infer_date is missing or older than today, run infer-knowledge", "proactive save every 15 min"), extract it as a `rule`-type knowledge item with exact wording.
-- **System components:** Any component, script, or task mentioned in 3+ episodes should be extracted as a `fact` or `convention` and get a graph node in Step 6.
+- **Operational rules:** If the user explicitly states a rule or convention (e.g., "at conversation start, if last_infer_date is missing or older than today, run infer-knowledge", "proactive save every 15 min"), extract it as a `rule`-type knowledge item with exact wording.
+- **System components:** Any component, script, or task mentioned in 3+ conversations should be extracted as a `fact` or `convention` and get a graph node in Step 6.
 
 ## Step 2: Merge
 
@@ -42,7 +40,7 @@ Semantic dedup only — exact-match dedup is already handled by pre.sh. Compare 
 
 ## Step 3: Contradiction scan
 
-For every `trait` and `preference`, compare stated belief against behavioral evidence in episodes. Mark `contested: true` with `counter_evidence` when behavior contradicts belief. A single counter-example suffices. Clear only when behavior genuinely changes. Track count for report.
+For every `trait` and `preference`, compare stated belief against behavioral evidence in conversations. Mark `contested: true` with `counter_evidence` when behavior contradicts belief. A single counter-example suffices. Clear only when behavior genuinely changes. Track count for report.
 
 ## Step 4: Prune
 
@@ -121,18 +119,18 @@ Generate inferred edges automatically based on these rules (unless explicitly co
 
 ### Graph extraction priorities
 
-- **People nodes:** Use real names. If an episode says "Vladimir I. Petrovsky", the node id should be `vladimir-petrovsky`, not `anya-father`. Include full names in `name` and role-based aliases (e.g., `aliases: ["anya's father"]`).
-- **Concept nodes:** Create nodes (type `concept`) for intellectual theses, design principles, and philosophical threads discussed across episodes — not just system components. Examples: "feelings-as-floats", "toast approach", "personhood", "three-tier memory".
+- **People nodes:** Use real names. If a conversation says "Vladimir I. Petrovsky", the node id should be `vladimir-petrovsky`, not `anya-father`. Include full names in `name` and role-based aliases (e.g., `aliases: ["anya's father"]`).
+- **Concept nodes:** Create nodes (type `concept`) for intellectual theses, design principles, and philosophical threads discussed across conversations — not just system components. Examples: "feelings-as-floats", "toast approach", "personhood", "three-tier memory".
 - **Inter-component edges:** Don't just connect everything to the project hub with `part_of`. Create edges BETWEEN components that interact: data flow (`writes_to`, `reads_from`), dependency (`uses`), hierarchy (`part_of` subsystem, not just `part_of` project), and rationale (`motivated_by`). For example: three-tier-memory → episodic-memory (`part_of`), suggest-learned-behavior → learned-triggers (`reads_from`), prepare-handoff → named-conversations (`uses`).
-- **Motivation chains:** When episodes explain WHY something was designed a certain way, create `motivated_by` edges linking the component to the concept or decision that drove it. These are among the most valuable edges in the graph.
+- **Motivation chains:** When conversations explain WHY something was designed a certain way, create `motivated_by` edges linking the component to the concept or decision that drove it. These are among the most valuable edges in the graph.
 
 ### Instructions
 
 1. Read the existing graph from the `=== EXISTING GRAPH ===` section of pre.sh output
 2. For each new or updated knowledge item, identify entities and relationships
 3. Create new nodes for entities not already in the graph (use entity resolution)
-4. Create edges with meaningful fact descriptions — never "Co-occurred in N episodes"
-5. Update `last_seen` on existing nodes/edges that are referenced in current episodes
+4. Create edges with meaningful fact descriptions — never "Co-occurred in N conversations"
+5. Update `last_seen` on existing nodes/edges that are referenced in current data
 6. Flag edges for removal if they are stale or superseded (add to `edges_to_remove` list)
 7. Output the complete updated graph (all nodes and edges, not a delta) in your report
 
@@ -143,7 +141,7 @@ Run each by reading the task.md and executing:
 1. **Infer base persona:** `agent-persona/tasks/infer-base-persona/task.md`
 2. **Suggest behavior:** `agent-persona/tasks/suggest-learned-behavior/task.md` — include candidate in report if returned.
 3. **Proactive initiative:** `agent-persona/tasks/proactive-initiative/task.md` (trigger=`after_infer_knowledge`).
-4. **Reflect:** `agent-persona/tasks/reflect/task.md` — pass episode list, knowledge counts, eval log path.
+4. **Reflect:** `agent-persona/tasks/reflect/task.md` — pass knowledge counts, eval log path.
 
 ## Step 8: Persist
 
@@ -157,7 +155,7 @@ Pipe report to `bash agent-persona/tasks/infer-knowledge/post.sh` via Shell. Ret
 | `content` | yes | Short, self-contained sentence(s) |
 | `scope` | no | `user`, `project`, or `global`; default `project` |
 | `strength` | no | Integer 1–5; default 1 |
-| `source` | no | Episode session id(s) or "explicit user" |
+| `source` | no | Session id(s) or "explicit user" |
 | `polarity` | no | `like` or `dislike` (preferences only) |
 | `source_type` | no | `self_reported`, `observed`, or `inferred` |
 | `contested` | no | `true` if counter-evidence exists |

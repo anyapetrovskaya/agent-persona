@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# infer-knowledge/post.sh — post-processing: enforce invariants, validate graph, archive, timeline, cleanup
+# infer-knowledge/post.sh — post-processing: enforce invariants, validate graph, timeline, cleanup
 set -euo pipefail
 
 AP_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -12,7 +12,7 @@ REPORT=$(cat)
 
 # ── 0. Success check ─────────────────────────────────────────────────────────
 if [[ -z "$REPORT" ]] || ! echo "$REPORT" | grep -qiE 'Processed|items|added|updated|pruned|Counts'; then
-  echo "ERROR: LLM report is empty or malformed — aborting without archiving episodes" >&2
+  echo "ERROR: LLM report is empty or malformed — aborting" >&2
   exit 1
 fi
 
@@ -156,12 +156,14 @@ if [[ -f "$GRAPH" ]]; then
   [[ -z "$GRAPH_WARN" ]] && GRAPH_WARN="clean"
 fi
 
-# ── 8. Archive scanned episodes ──────────────────────────────────────────────
-if [[ -d "$DATA_DIR/episodic/to_scan" ]]; then
-  mkdir -p "$DATA_DIR/episodic/archived"
-  for f in "$DATA_DIR/episodic/to_scan"/*.json; do
-    [[ -f "$f" ]] && mv "$f" "$DATA_DIR/episodic/archived/"
+# ── 8. Move processed short-term files ───────────────────────────────────────
+ST_DIR="$DATA_DIR/short-term"
+if [[ -d "$ST_DIR/to_process" ]]; then
+  mkdir -p "$ST_DIR/processed"
+  for f in "$ST_DIR/to_process"/*.jsonl; do
+    [[ -f "$f" ]] && mv "$f" "$ST_DIR/processed/"
   done
+  rmdir "$ST_DIR/to_process" 2>/dev/null || true
 fi
 
 # ── 9. Rebuild timeline ──────────────────────────────────────────────────────

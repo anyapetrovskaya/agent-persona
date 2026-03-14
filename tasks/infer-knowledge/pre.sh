@@ -20,74 +20,13 @@ validate_json() {
   fi
 }
 
-FIELD_BLOCKLIST=(
-  "type" "content" "turn" "timestamp" "emotional_value" "session"
-  "entity_name" "source" "category" "emotional_valence" "context" "summary"
-)
-
-# ── Gather episode file lists (needed by field-frequency + final output) ─────
-shopt -s nullglob
-TO_SCAN_FILES=("$DATA_DIR/episodic/to_scan"/episode_*.json)
-ACTIVE_FILES=("$DATA_DIR/episodic"/episode_*.json)
-ALL_EP_FILES=("${TO_SCAN_FILES[@]}" "${ACTIVE_FILES[@]}")
-shopt -u nullglob
-
-# ── 1. Field-frequency boosting (single-pass) ───────────────────────────────
-FIELD_BOOSTED=0
-if (( ${#ALL_EP_FILES[@]} > 0 )) && [[ -f "$KNOWLEDGE" ]]; then
-  BLOCKLIST_JQ=$(printf '%s\n' "${FIELD_BLOCKLIST[@]}" | jq -R -s 'split("\n") | map(select(length > 0))')
-
-  FIELD_FREQ=$(jq -s --argjson bl "$BLOCKLIST_JQ" '
-    [.[].records[] | keys[]] |
-    group_by(.) |
-    map({field: .[0], count: length}) |
-    [.[] | select(
-      .count >= 50 and
-      (.field as $f | $bl | map(ascii_downcase) | index($f | ascii_downcase) | not)
-    )] |
-    sort_by(-.count)
-  ' "${ALL_EP_FILES[@]}" 2>/dev/null || echo '[]')
-
-  FREQ_COUNT=$(echo "$FIELD_FREQ" | jq 'length')
-
-  if (( FREQ_COUNT > 0 )); then
-    BOOST_MAP=$(echo "$FIELD_FREQ" | jq '
-      [.[] | {
-        key: .field,
-        value: ((.count / 50 | floor) | if . > 5 then 5 elif . < 1 then 1 else . end)
-      }] | from_entries
-    ')
-
-    FIELD_BOOSTED=$(jq --argjson boosts "$BOOST_MAP" '
-      [.items[] | . as $item | select(
-        any($boosts | to_entries[];
-          . as $e | $item.content | ascii_downcase | contains($e.key | ascii_downcase)
-        )
-      )] | length
-    ' "$KNOWLEDGE")
-
-    jq --argjson boosts "$BOOST_MAP" --arg today "$TODAY" '
-      .items |= [.[] |
-        reduce ($boosts | to_entries[]) as $e (.;
-          if (.content | ascii_downcase | contains($e.key | ascii_downcase)) then
-            .strength = ([(.strength // 1) + $e.value, 5] | min) |
-            if ((.source // "") | contains("field-freq:" + $today)) then .
-            else .source = ((.source // "") + " field-freq:" + $today) end
-          else . end
-        )
-      ]
-    ' "$KNOWLEDGE" > "${KNOWLEDGE}.tmp" && mv "${KNOWLEDGE}.tmp" "$KNOWLEDGE"
-  fi
-  log "Field-frequency: boosted $FIELD_BOOSTED items"
-fi
-
-# ── 2. Compute decay (now sees boosted strengths) ────────────────────────────
+# ── 1. Compute decay ────────────────────────────────────────────────────────
 DECAY_RC=0
 DECAY_OUT=$(bash "$SCRIPTS/compute-decay.sh" 2>&1) || DECAY_RC=$?
 log "Decay: $DECAY_OUT"
 if [[ -f "$KNOWLEDGE" ]]; then validate_json "$KNOWLEDGE" "compute-decay"; fi
 
-# ── 3. Auto-remove forgotten items (retention_score < 0.5, not pinned) ──────
+# ── 2. Auto-remove forgotten items (retention_score < 0.5, not pinned) ──────
 FORGOTTEN=0
 FORGOTTEN_ITEMS="[]"
 if [[ -f "$KNOWLEDGE" ]]; then
@@ -117,7 +56,7 @@ if [[ -f "$KNOWLEDGE" ]]; then
   fi
 fi
 
-# ── 4. Exact-match dedup ────────────────────────────────────────────────────
+# ── 3. Exact-match dedup ────────────────────────────────────────────────────
 DEDUPED=0
 if [[ -f "$KNOWLEDGE" ]]; then
   BEFORE_COUNT=$(jq '.items | length' "$KNOWLEDGE")
@@ -151,7 +90,7 @@ if [[ -f "$KNOWLEDGE" ]]; then
   fi
 fi
 
-# ── 5. Snapshot script-managed fields ───────────────────────────────────────
+# ── 4. Snapshot script-managed fields ───────────────────────────────────────
 if [[ -f "$KNOWLEDGE" ]]; then
   mkdir -p "$DATA_DIR/.staging"
   jq '{items: [.items | to_entries[] | {
@@ -164,7 +103,7 @@ if [[ -f "$KNOWLEDGE" ]]; then
   }]}' "$KNOWLEDGE" > "$DATA_DIR/.staging/field-snapshot.json"
 fi
 
-# ── 6. Collect stats ─────────────────────────────────────────────────────────
+# ── 5. Collect stats ─────────────────────────────────────────────────────────
 if [[ -f "$KNOWLEDGE" ]]; then
   ITEM_COUNT=$(jq '.items | length' "$KNOWLEDGE")
   FADING_COUNT=$(jq '[.items[] | select(.retention_score != null and .retention_score >= 0.5 and .retention_score < 1.5 and (.pinned != true))] | length' "$KNOWLEDGE")
@@ -175,13 +114,7 @@ else
   ITEM_COUNT=0; FADING_COUNT=0; HEALTHY_COUNT=0; SURFACING="[]"; SURFACING_COUNT=0
 fi
 
-# ── 7. List episode files ───────────────────────────────────────────────────
-EP_LIST=""
-for f in "${ALL_EP_FILES[@]}"; do
-  EP_LIST="${EP_LIST}  $(basename "$f")"$'\n'
-done
-
-# ── 8. Graph context for LLM ────────────────────────────────────────────────
+# ── 6. Graph context for LLM ────────────────────────────────────────────────
 GRAPH_NODES=""
 GRAPH_EDGES=""
 if [[ -f "$GRAPH" ]]; then
@@ -189,18 +122,22 @@ if [[ -f "$GRAPH" ]]; then
   GRAPH_EDGES=$(jq -c '[.edges[] | {id, source, target, type, fact}]' "$GRAPH" 2>/dev/null || echo '[]')
 fi
 
-# ── 9. Short-term transcripts ──────────────────────────────────────────────
+# ── 7. Short-term transcripts (atomic snapshot) ────────────────────────────
 ST_DIR="$DATA_DIR/short-term"
+mkdir -p "$ST_DIR/to_process"
+for f in "$ST_DIR"/*.jsonl; do
+  [[ -f "$f" ]] && mv "$f" "$ST_DIR/to_process/"
+done
 ST_CONTENT=""
-if [[ -d "$ST_DIR" ]]; then
-  for f in "$ST_DIR"/*.jsonl; do
+if [[ -d "$ST_DIR/to_process" ]]; then
+  for f in "$ST_DIR/to_process"/*.jsonl; do
     [[ -f "$f" ]] || continue
     ST_CONTENT="${ST_CONTENT}$(cat "$f")
 "
   done
 fi
 
-# ── 10. Living doc changes since last inference ───────────────────────────
+# ── 8. Living doc changes since last inference ───────────────────────────
 LIVING_DOC_DIFF=""
 LIVING_DOCS_DIR="$DATA_DIR/living-docs"
 LAST_COMMIT_FILE="$DATA_DIR/.staging/last_infer_commit.txt"
@@ -228,7 +165,6 @@ echo ""
 printf "%s" "$SUMMARY"
 echo ""
 echo "Knowledge: $ITEM_COUNT items ($HEALTHY_COUNT healthy, $FADING_COUNT fading, $FORGOTTEN forgotten/removed)"
-echo "Schema: $FIELD_BOOSTED field-boosted"
 if (( DEDUPED > 0 )); then echo "Dedup: $DEDUPED duplicates merged"; fi
 echo "Surfacing: $SURFACING_COUNT candidates"
 [[ "$SURFACING_COUNT" -gt 0 ]] && echo "Surfacing items: $SURFACING"
@@ -245,6 +181,3 @@ echo "$ST_CONTENT"
 echo ""
 echo "=== LIVING DOC CHANGES ==="
 echo "$LIVING_DOC_DIFF"
-echo ""
-echo "Episodes to process:"
-printf "%s" "$EP_LIST"
