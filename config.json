@@ -1,6 +1,6 @@
 {
-  "platform": "ide",
-  "git_sync": false,
+  "platform": "web",
+  "git_sync": true,
   "debug": true,
   "timezone": "America/Los_Angeles",
   "short_term_retention_days": 3,
