@@ -10,7 +10,7 @@ TODAY=$(date +%Y-%m-%d)
 REPORT=$(cat)
 
 # ── 0. Success check ─────────────────────────────────────────────────────────
-if [[ -z "$REPORT" ]] || ! echo "$REPORT" | grep -qiE 'Processed|items'; then
+if [[ -z "$REPORT" ]] || ! echo "$REPORT" | grep -qiE 'Processed|items|added|updated|pruned|Counts'; then
   echo "ERROR: LLM report is empty or malformed — aborting without archiving episodes" >&2
   exit 1
 fi

@@ -205,13 +205,14 @@ fi
 # ── 8. Snapshot script-managed fields ───────────────────────────────────────
 if [[ -f "$KNOWLEDGE" ]]; then
   mkdir -p "$DATA_DIR/.staging"
-  jq '[.items | to_entries[] | {
+  jq '{items: [.items | to_entries[] | {
     index: .key,
+    content: .value.content,
     pinned: (.value.pinned // false),
     last_accessed: (.value.last_accessed // null),
     access_count: (.value.access_count // 0),
     retention_score: (.value.retention_score // null)
-  }]' "$KNOWLEDGE" > "$DATA_DIR/.staging/field-snapshot.json"
+  }]}' "$KNOWLEDGE" > "$DATA_DIR/.staging/field-snapshot.json"
 fi
 
 # ── 9. Collect stats ─────────────────────────────────────────────────────────

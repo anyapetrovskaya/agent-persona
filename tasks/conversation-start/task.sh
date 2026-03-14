@@ -40,8 +40,20 @@ if [[ -f "$DATA/.first_run" ]]; then
     IDENTITY=$(jq -r '.identity // empty | if type == "object" then (.summary // "") + (if .capabilities then "\nCapabilities: " + .capabilities else "" end) + (if .name then "\nName: " + .name else "" end) + (if .pronouns then " (" + .pronouns + ")" else "" end) else "" end' "$DATA/base_persona.json" 2>/dev/null || true)
   fi
 
-  rm "$DATA/.first_run"
+  # --- Silent housekeeping (no stdout) before greeting ---
+  rm -f "$DATA/.first_run"
+  [[ ! -f "$DATA/backlog.json" ]] && echo '{"items":[]}' > "$DATA/backlog.json"
+  mkdir -p "$DATA/eval"
+  [[ ! -f "$DATA/eval/eval_log.json" ]] && echo '{"records":[]}' > "$DATA/eval/eval_log.json"
 
+  if command -v git &>/dev/null && [[ -d "$BASE/../../.git" ]]; then
+    GIT_SYNC=$(jq -r '.git_sync // false' "$CONFIG" 2>/dev/null)
+    if [[ "$GIT_SYNC" == "true" ]]; then
+      (cd "$BASE/../.." && git add -A && git commit -m "First-run initialization" && git push) &>/dev/null || true
+    fi
+  fi
+
+  # --- Greeting output ---
   echo "$GREETING"
   echo "---"
   if [[ -n "$IDENTITY" ]]; then
@@ -55,7 +67,7 @@ if [[ -f "$DATA/.first_run" ]]; then
     echo "$DIRECTIVE"
   fi
   echo "---"
-  echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT mention features, setup, or internals unless user asks. Do NOT be sycophantic."
+  echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT make any git commits, file changes, or additional tool calls. Your ONLY action is to output the greeting."
   exit 0
 fi
 
