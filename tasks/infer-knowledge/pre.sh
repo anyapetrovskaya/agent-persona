@@ -189,6 +189,39 @@ if [[ -f "$GRAPH" ]]; then
   GRAPH_EDGES=$(jq -c '[.edges[] | {id, source, target, type, fact}]' "$GRAPH" 2>/dev/null || echo '[]')
 fi
 
+# ── 9. Short-term transcripts ──────────────────────────────────────────────
+ST_DIR="$DATA_DIR/short-term"
+ST_CONTENT=""
+if [[ -d "$ST_DIR" ]]; then
+  for f in "$ST_DIR"/*.jsonl; do
+    [[ -f "$f" ]] || continue
+    ST_CONTENT="${ST_CONTENT}$(cat "$f")
+"
+  done
+fi
+
+# ── 10. Living doc changes since last inference ───────────────────────────
+LIVING_DOC_DIFF=""
+LIVING_DOCS_DIR="$DATA_DIR/living-docs"
+LAST_COMMIT_FILE="$DATA_DIR/.staging/last_infer_commit.txt"
+if [[ -d "$LIVING_DOCS_DIR" ]] && git -C "$AP_DIR" rev-parse --git-dir &>/dev/null; then
+  if [[ -f "$LAST_COMMIT_FILE" ]]; then
+    LAST_COMMIT=$(cat "$LAST_COMMIT_FILE")
+    if git -C "$AP_DIR" cat-file -t "$LAST_COMMIT" &>/dev/null; then
+      LIVING_DOC_DIFF=$(git -C "$AP_DIR" diff --stat --patch "$LAST_COMMIT" -- "$LIVING_DOCS_DIR" 2>/dev/null || true)
+    fi
+  fi
+  if [[ -z "$LIVING_DOC_DIFF" ]]; then
+    shopt -s nullglob
+    LD_FILES=("$LIVING_DOCS_DIR"/*.md "$LIVING_DOCS_DIR"/*.json "$LIVING_DOCS_DIR"/*.txt)
+    shopt -u nullglob
+    for ldf in "${LD_FILES[@]}"; do
+      LIVING_DOC_DIFF+="--- $(basename "$ldf") (full content, first run) ---"$'\n'
+      LIVING_DOC_DIFF+="$(cat "$ldf")"$'\n\n'
+    done
+  fi
+fi
+
 # ── Output summary ───────────────────────────────────────────────────────────
 echo "=== PRE-PROCESSING COMPLETE ==="
 echo ""
@@ -206,6 +239,12 @@ echo ""
 echo "=== EXISTING GRAPH ==="
 echo "Nodes: $GRAPH_NODES"
 echo "Edges: $GRAPH_EDGES"
+echo ""
+echo "=== SHORT-TERM MEMORY ==="
+echo "$ST_CONTENT"
+echo ""
+echo "=== LIVING DOC CHANGES ==="
+echo "$LIVING_DOC_DIFF"
 echo ""
 echo "Episodes to process:"
 printf "%s" "$EP_LIST"

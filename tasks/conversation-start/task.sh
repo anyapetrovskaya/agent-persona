@@ -99,7 +99,7 @@ if [[ -f "$DATA/.first_run" ]]; then
   fi
   echo "---"
   HHMM=$(date +%H:%M)
-  [[ "$LANGUAGE" != "en" ]] && echo "Respond in $(language_name "$LANGUAGE")."
+  [[ "$LANGUAGE" != "en" ]] && echo "Preferred language: $(language_name "$LANGUAGE"). Always respond in $(language_name "$LANGUAGE") unless the user expressly asks otherwise."
   echo "Output the greeting above verbatim. Follow personality directive for the session. Do NOT run the footer. Do NOT make any git commits, file changes, or additional tool calls. Your ONLY action is to output the greeting."
   [[ "$PLATFORM" == "web" ]] && echo "Your LAST line of response must be: — $HHMM —"
   exit 0

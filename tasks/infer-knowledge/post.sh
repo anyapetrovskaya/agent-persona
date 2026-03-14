@@ -183,6 +183,10 @@ rm -f "$DATA_DIR"/.staging/infer-knowledge-*.json
 rm -f "$SNAPSHOT"
 echo "post.sh: staging files cleaned" >&2
 
+# ── 12. Save commit hash for living doc diff tracking ────────────────────────
+mkdir -p "$DATA_DIR/.staging"
+git -C "$AP_DIR" rev-parse HEAD > "$DATA_DIR/.staging/last_infer_commit.txt" 2>/dev/null || true
+
 # ── Output report + post-processing ──────────────────────────────────────────
 echo "$REPORT"
 echo ""

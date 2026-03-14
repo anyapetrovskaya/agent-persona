@@ -8,9 +8,17 @@ You are the infer-knowledge sub-agent. Your job is **semantic judgment only** �
 2. Read episode files listed in the pre.sh output from `agent-persona/data/episodic/` and `agent-persona/data/episodic/to_scan/`.
 3. Read `agent-persona/data/knowledge/knowledge.json` (already updated by pre.sh with reinforcement and decay).
 
+### Input sources
+
+Pre.sh provides these context sections:
+- **Existing knowledge:** Current knowledge items for dedup/merge
+- **Existing graph:** Current nodes and edges for entity resolution
+- **Short-term memory:** Recent conversation transcripts (last ~3 days), both conversation-tagged captures and imported full transcripts. These are the primary source for extracting new knowledge items and graph entities.
+- **Episodes (to_scan/):** Structured episodic records (legacy — being phased out as primary source in favor of short-term memory)
+
 ## Step 1: Extract
 
-From episode records, create candidate knowledge items:
+From short-term memory (primary source) and episode records (legacy), create candidate knowledge items:
 
 - **Decisions** → `rule` or `fact` (generalize wording)
 - **Corrections** → `preference` with `polarity: "dislike"`

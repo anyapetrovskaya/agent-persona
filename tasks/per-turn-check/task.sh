@@ -20,6 +20,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="$SCRIPT_DIR/../../data"
 CONFIG="$SCRIPT_DIR/../../config.json"
 
+# ── Short-term capture ──
+ST_DIR="$BASE/short-term"
+mkdir -p "$ST_DIR"
+ST_CONV="${CONVERSATION_ARG:-main_1}"
+ST_DATE=$(date +%Y-%m-%d)
+ST_FILE="$ST_DIR/${ST_CONV}_${ST_DATE}.jsonl"
+if [[ -n "$MESSAGE" ]]; then
+  jq -nc \
+    --arg conv "$ST_CONV" \
+    --arg turn "$TURN" \
+    --arg msg "$MESSAGE" \
+    --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg role "user" \
+    '{conversation: $conv, turn: ($turn | tonumber), role: $role, content: $msg, timestamp: $ts}' \
+    >> "$ST_FILE"
+fi
+
 # --- Read config ---
 DEBUG=false
 TZ_VAL=""
@@ -222,10 +239,10 @@ else
 fi
 
 echo ""
-emit_persona_block
+# emit_persona_block  # Persona loaded on turn 0 and retained in context; skip on turn 1+
 echo "=== INSTRUCTIONS ==="
 if [[ "$LANGUAGE" != "en" && -n "$LANGUAGE" ]]; then
-  echo "Respond in $(language_name "$LANGUAGE")."
+  echo "Preferred language: $(language_name "$LANGUAGE"). Always respond in $(language_name "$LANGUAGE") unless the user expressly asks otherwise."
 fi
 if [[ "$PLATFORM" == "web" ]]; then
   echo "Follow any actions listed. Pass --session <id> to all task.sh calls."
